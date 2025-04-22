@@ -2,7 +2,10 @@ import * as FileSystem from 'expo-file-system';
 import OpenAI from 'openai';
 
 // Initialize OpenAI client with API key from environment variables
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+// Get API key from the Replit environment
+const openai = new OpenAI({ 
+  apiKey: process.env.OPENAI_API_KEY || process.env.REPLIT_OPENAI_API_KEY
+});
 
 /**
  * Analyzes a food image to extract nutritional information
