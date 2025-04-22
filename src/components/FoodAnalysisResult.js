@@ -1,17 +1,9 @@
-import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ScrollView,
-  TextInput,
-  Switch,
-} from 'react-native';
+import React from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { Icon } from '../assets/icons';
-import { getMealTypeIcon, getMealTypeColor } from '../assets/icons';
 import * as Animatable from 'react-native-animatable';
-import { suggestMealTypeByTime } from '../utils/foodAnalysis';
+import { calculateMacroPercentages } from '../utils/foodAnalysis';
+import { getNutrientColor } from '../assets/icons';
 
 /**
  * A component to display the results of food analysis from OpenAI
@@ -20,650 +12,447 @@ import { suggestMealTypeByTime } from '../utils/foodAnalysis';
  * @param {Function} onAdjust - Function to call when adjust button is pressed
  * @param {Function} onCancel - Function to call when cancel button is pressed
  */
-const FoodAnalysisResult = ({ foodData, onSave, onCancel, theme }) => {
-  // Local state for editing
-  const [isEditing, setIsEditing] = useState(false);
-  const [editedData, setEditedData] = useState({ ...foodData });
-  const [selectedMealType, setSelectedMealType] = useState(
-    foodData.mealType || suggestMealTypeByTime()
+const FoodAnalysisResult = ({ foodData, onSave, onAdjust, onCancel, theme }) => {
+  // Calculate macro percentages
+  const macroPercentages = calculateMacroPercentages(
+    foodData.protein || 0,
+    foodData.carbs || 0,
+    foodData.fat || 0
   );
   
-  // Meal type options
-  const mealTypes = [
-    { id: 'breakfast', label: 'Breakfast' },
-    { id: 'lunch', label: 'Lunch' },
-    { id: 'dinner', label: 'Dinner' },
-    { id: 'snack', label: 'Snack' },
-  ];
-  
-  // Format numbers with one decimal place if needed
-  const formatNumber = (num) => {
-    if (Number.isInteger(num)) {
-      return num.toString();
-    }
-    return num.toFixed(1);
-  };
-  
-  // Handle save with current data
-  const handleSave = () => {
-    // Include selected meal type
-    const dataToSave = {
-      ...foodData,
-      mealType: selectedMealType,
-    };
-    
-    onSave(dataToSave);
-  };
-  
-  // Handle save with edited data
-  const handleSaveEdited = () => {
-    // Include selected meal type
-    const dataToSave = {
-      ...editedData,
-      mealType: selectedMealType,
-    };
-    
-    onSave(dataToSave);
-  };
-  
-  // Toggle editing mode
-  const toggleEditing = () => {
-    setIsEditing(!isEditing);
-  };
-  
-  // Update edited data field
-  const updateField = (field, value) => {
-    setEditedData({
-      ...editedData,
-      [field]: value,
-    });
-  };
-  
-  // Update numerical field (with validation)
-  const updateNumericField = (field, value) => {
-    const parsedValue = parseFloat(value);
-    if (!isNaN(parsedValue) || value === '') {
-      updateField(field, value === '' ? 0 : parsedValue);
-    }
-  };
-  
-  // Icon and color for selected meal type
-  const mealTypeIcon = getMealTypeIcon(selectedMealType);
-  const mealTypeColor = getMealTypeColor(selectedMealType);
-  
-  // Render the nutrition info section (non-editing mode)
-  const renderNutritionInfo = () => (
-    <View style={styles.nutritionContainer}>
-      <View style={styles.nutritionRow}>
-        <View style={styles.nutritionItem}>
-          <Text
-            style={[
-              styles.nutritionValue,
-              { color: theme.colors.text, fontSize: 28 },
-            ]}
-          >
-            {foodData.calories}
-          </Text>
-          <Text
-            style={[
-              styles.nutritionLabel,
-              { color: theme.colors.secondaryText },
-            ]}
-          >
-            Calories
-          </Text>
-        </View>
-      </View>
-      
-      <View style={styles.nutritionRow}>
-        <View style={styles.nutritionItem}>
-          <Text style={[styles.nutritionValue, { color: theme.colors.text }]}>
-            {formatNumber(foodData.protein)}g
-          </Text>
-          <Text
-            style={[
-              styles.nutritionLabel,
-              { color: theme.colors.secondaryText },
-            ]}
-          >
-            Protein
-          </Text>
-        </View>
-        <View style={styles.nutritionItem}>
-          <Text style={[styles.nutritionValue, { color: theme.colors.text }]}>
-            {formatNumber(foodData.carbs)}g
-          </Text>
-          <Text
-            style={[
-              styles.nutritionLabel,
-              { color: theme.colors.secondaryText },
-            ]}
-          >
-            Carbs
-          </Text>
-        </View>
-        <View style={styles.nutritionItem}>
-          <Text style={[styles.nutritionValue, { color: theme.colors.text }]}>
-            {formatNumber(foodData.fat)}g
-          </Text>
-          <Text
-            style={[
-              styles.nutritionLabel,
-              { color: theme.colors.secondaryText },
-            ]}
-          >
-            Fat
-          </Text>
-        </View>
-      </View>
-      
-      <View style={styles.nutritionRow}>
-        <View style={styles.nutritionItem}>
-          <Text style={[styles.nutritionValue, { color: theme.colors.text }]}>
-            {formatNumber(foodData.fiber || 0)}g
-          </Text>
-          <Text
-            style={[
-              styles.nutritionLabel,
-              { color: theme.colors.secondaryText },
-            ]}
-          >
-            Fiber
-          </Text>
-        </View>
-        <View style={styles.nutritionItem}>
-          <Text style={[styles.nutritionValue, { color: theme.colors.text }]}>
-            {formatNumber(foodData.sugar || 0)}g
-          </Text>
-          <Text
-            style={[
-              styles.nutritionLabel,
-              { color: theme.colors.secondaryText },
-            ]}
-          >
-            Sugar
-          </Text>
-        </View>
-        <View style={styles.nutritionItem}>
-          <Text style={[styles.nutritionValue, { color: theme.colors.text }]}>
-            {foodData.healthScore ? foodData.healthScore + '/10' : 'N/A'}
-          </Text>
-          <Text
-            style={[
-              styles.nutritionLabel,
-              { color: theme.colors.secondaryText },
-            ]}
-          >
-            Health
-          </Text>
-        </View>
-      </View>
-    </View>
-  );
-  
-  // Render editable nutrition fields
-  const renderEditableNutrition = () => (
-    <View style={styles.editableNutritionContainer}>
-      <View style={styles.editRow}>
-        <Text style={[styles.editLabel, { color: theme.colors.text }]}>
-          Name:
-        </Text>
-        <TextInput
-          style={[
-            styles.editInput,
-            {
-              color: theme.colors.text,
-              backgroundColor: theme.colors.surfaceHighlight,
-              borderColor: theme.colors.border,
-            },
-          ]}
-          value={editedData.name}
-          onChangeText={(text) => updateField('name', text)}
-          placeholder="Food name"
-          placeholderTextColor={theme.colors.placeholder}
-        />
-      </View>
-      
-      <View style={styles.editRow}>
-        <Text style={[styles.editLabel, { color: theme.colors.text }]}>
-          Calories:
-        </Text>
-        <TextInput
-          style={[
-            styles.editInput,
-            {
-              color: theme.colors.text,
-              backgroundColor: theme.colors.surfaceHighlight,
-              borderColor: theme.colors.border,
-            },
-          ]}
-          value={String(editedData.calories)}
-          onChangeText={(text) => updateNumericField('calories', text)}
-          keyboardType="numeric"
-          placeholder="Calories"
-          placeholderTextColor={theme.colors.placeholder}
-        />
-      </View>
-      
-      <View style={styles.editRow}>
-        <Text style={[styles.editLabel, { color: theme.colors.text }]}>
-          Protein (g):
-        </Text>
-        <TextInput
-          style={[
-            styles.editInput,
-            {
-              color: theme.colors.text,
-              backgroundColor: theme.colors.surfaceHighlight,
-              borderColor: theme.colors.border,
-            },
-          ]}
-          value={String(editedData.protein)}
-          onChangeText={(text) => updateNumericField('protein', text)}
-          keyboardType="numeric"
-          placeholder="Protein"
-          placeholderTextColor={theme.colors.placeholder}
-        />
-      </View>
-      
-      <View style={styles.editRow}>
-        <Text style={[styles.editLabel, { color: theme.colors.text }]}>
-          Carbs (g):
-        </Text>
-        <TextInput
-          style={[
-            styles.editInput,
-            {
-              color: theme.colors.text,
-              backgroundColor: theme.colors.surfaceHighlight,
-              borderColor: theme.colors.border,
-            },
-          ]}
-          value={String(editedData.carbs)}
-          onChangeText={(text) => updateNumericField('carbs', text)}
-          keyboardType="numeric"
-          placeholder="Carbs"
-          placeholderTextColor={theme.colors.placeholder}
-        />
-      </View>
-      
-      <View style={styles.editRow}>
-        <Text style={[styles.editLabel, { color: theme.colors.text }]}>
-          Fat (g):
-        </Text>
-        <TextInput
-          style={[
-            styles.editInput,
-            {
-              color: theme.colors.text,
-              backgroundColor: theme.colors.surfaceHighlight,
-              borderColor: theme.colors.border,
-            },
-          ]}
-          value={String(editedData.fat)}
-          onChangeText={(text) => updateNumericField('fat', text)}
-          keyboardType="numeric"
-          placeholder="Fat"
-          placeholderTextColor={theme.colors.placeholder}
-        />
-      </View>
-      
-      <View style={styles.editRow}>
-        <Text style={[styles.editLabel, { color: theme.colors.text }]}>
-          Fiber (g):
-        </Text>
-        <TextInput
-          style={[
-            styles.editInput,
-            {
-              color: theme.colors.text,
-              backgroundColor: theme.colors.surfaceHighlight,
-              borderColor: theme.colors.border,
-            },
-          ]}
-          value={String(editedData.fiber || 0)}
-          onChangeText={(text) => updateNumericField('fiber', text)}
-          keyboardType="numeric"
-          placeholder="Fiber"
-          placeholderTextColor={theme.colors.placeholder}
-        />
-      </View>
-      
-      <View style={styles.editRow}>
-        <Text style={[styles.editLabel, { color: theme.colors.text }]}>
-          Sugar (g):
-        </Text>
-        <TextInput
-          style={[
-            styles.editInput,
-            {
-              color: theme.colors.text,
-              backgroundColor: theme.colors.surfaceHighlight,
-              borderColor: theme.colors.border,
-            },
-          ]}
-          value={String(editedData.sugar || 0)}
-          onChangeText={(text) => updateNumericField('sugar', text)}
-          keyboardType="numeric"
-          placeholder="Sugar"
-          placeholderTextColor={theme.colors.placeholder}
-        />
-      </View>
-    </View>
-  );
+  // Get nutrient colors from theme
+  const proteinColor = theme.colors.protein || getNutrientColor('protein');
+  const carbsColor = theme.colors.carbs || getNutrientColor('carbs');
+  const fatColor = theme.colors.fat || getNutrientColor('fat');
   
   return (
-    <ScrollView
-      style={[styles.container, { backgroundColor: theme.colors.background }]}
-      contentContainerStyle={styles.contentContainer}
+    <Animatable.View 
+      animation="fadeInUp"
+      duration={500}
+      style={[styles.container, { backgroundColor: theme.colors.surface }]}
     >
-      {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={onCancel}
-        >
-          <Icon name="arrow-left" size={24} color={theme.colors.text} />
-        </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
+        <Text style={[styles.title, { color: theme.colors.text }]}>
           Food Analysis
         </Text>
-        <TouchableOpacity style={styles.editButton} onPress={toggleEditing}>
-          <Icon
-            name={isEditing ? 'x' : 'edit-2'}
-            size={20}
-            color={theme.colors.primary}
-          />
+        
+        <TouchableOpacity
+          onPress={onCancel}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <Icon name="x" size={24} color={theme.colors.secondaryText} />
         </TouchableOpacity>
       </View>
       
-      {/* Food Name */}
-      <Animatable.View animation="fadeIn" duration={600}>
-        <Text style={[styles.foodName, { color: theme.colors.text }]}>
-          {isEditing ? editedData.name : foodData.name}
-        </Text>
-      </Animatable.View>
-      
-      {/* Nutrition Info */}
-      <Animatable.View animation="fadeIn" duration={600} delay={100}>
-        {isEditing ? renderEditableNutrition() : renderNutritionInfo()}
-      </Animatable.View>
-      
-      {/* Description */}
-      {!isEditing && foodData.description && (
-        <Animatable.View animation="fadeIn" duration={600} delay={200}>
-          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-            Description
+      <ScrollView style={styles.scrollContainer}>
+        <View style={styles.foodInfoContainer}>
+          <Text style={[styles.foodName, { color: theme.colors.text }]}>
+            {foodData.name || 'Unknown Food'}
           </Text>
-          <Text
-            style={[
-              styles.descriptionText,
-              { color: theme.colors.secondaryText },
-            ]}
-          >
-            {foodData.description}
-          </Text>
-        </Animatable.View>
-      )}
-      
-      {/* Health Tips */}
-      {!isEditing && foodData.tips && (
-        <Animatable.View animation="fadeIn" duration={600} delay={300}>
-          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-            Health Tips
-          </Text>
-          <View
-            style={[
-              styles.tipsContainer,
-              { backgroundColor: theme.colors.surface },
-            ]}
-          >
-            <Icon
-              name="info"
-              size={20}
-              color={theme.colors.primary}
-              style={styles.tipsIcon}
+          
+          <View style={styles.calorieContainer}>
+            <Text style={[styles.calorieCount, { color: theme.colors.text }]}>
+              {foodData.calories || 0}
+            </Text>
+            <Text style={[styles.calorieUnit, { color: theme.colors.secondaryText }]}>
+              kcal
+            </Text>
+          </View>
+        </View>
+        
+        {/* Macro distribution chart */}
+        <View style={styles.macroChart}>
+          <View style={styles.macroBarContainer}>
+            <View 
+              style={[
+                styles.macroBarSegment,
+                { 
+                  backgroundColor: proteinColor,
+                  width: `${macroPercentages.protein}%`,
+                }
+              ]}
             />
-            <Text
-              style={[styles.tipsText, { color: theme.colors.secondaryText }]}
-            >
+            <View 
+              style={[
+                styles.macroBarSegment,
+                { 
+                  backgroundColor: carbsColor,
+                  width: `${macroPercentages.carbs}%`,
+                }
+              ]}
+            />
+            <View 
+              style={[
+                styles.macroBarSegment,
+                { 
+                  backgroundColor: fatColor,
+                  width: `${macroPercentages.fat}%`,
+                }
+              ]}
+            />
+          </View>
+          
+          <View style={styles.macroLegend}>
+            <View style={styles.macroLegendItem}>
+              <View style={[styles.macroLegendColor, { backgroundColor: proteinColor }]} />
+              <Text style={[styles.macroLegendText, { color: theme.colors.secondaryText }]}>
+                Protein {macroPercentages.protein}%
+              </Text>
+            </View>
+            
+            <View style={styles.macroLegendItem}>
+              <View style={[styles.macroLegendColor, { backgroundColor: carbsColor }]} />
+              <Text style={[styles.macroLegendText, { color: theme.colors.secondaryText }]}>
+                Carbs {macroPercentages.carbs}%
+              </Text>
+            </View>
+            
+            <View style={styles.macroLegendItem}>
+              <View style={[styles.macroLegendColor, { backgroundColor: fatColor }]} />
+              <Text style={[styles.macroLegendText, { color: theme.colors.secondaryText }]}>
+                Fat {macroPercentages.fat}%
+              </Text>
+            </View>
+          </View>
+        </View>
+        
+        {/* Nutrients */}
+        <View style={styles.nutrientSection}>
+          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+            Nutrients
+          </Text>
+          
+          <View style={styles.nutrientGrid}>
+            <View style={styles.nutrientItem}>
+              <Text style={[styles.nutrientValue, { color: proteinColor }]}>
+                {foodData.protein || 0}g
+              </Text>
+              <Text style={[styles.nutrientLabel, { color: theme.colors.secondaryText }]}>
+                Protein
+              </Text>
+            </View>
+            
+            <View style={styles.nutrientItem}>
+              <Text style={[styles.nutrientValue, { color: carbsColor }]}>
+                {foodData.carbs || 0}g
+              </Text>
+              <Text style={[styles.nutrientLabel, { color: theme.colors.secondaryText }]}>
+                Carbs
+              </Text>
+            </View>
+            
+            <View style={styles.nutrientItem}>
+              <Text style={[styles.nutrientValue, { color: fatColor }]}>
+                {foodData.fat || 0}g
+              </Text>
+              <Text style={[styles.nutrientLabel, { color: theme.colors.secondaryText }]}>
+                Fat
+              </Text>
+            </View>
+            
+            <View style={styles.nutrientItem}>
+              <Text style={[styles.nutrientValue, { color: theme.colors.success }]}>
+                {foodData.fiber || 0}g
+              </Text>
+              <Text style={[styles.nutrientLabel, { color: theme.colors.secondaryText }]}>
+                Fiber
+              </Text>
+            </View>
+            
+            <View style={styles.nutrientItem}>
+              <Text style={[styles.nutrientValue, { color: theme.colors.warning }]}>
+                {foodData.sugar || 0}g
+              </Text>
+              <Text style={[styles.nutrientLabel, { color: theme.colors.secondaryText }]}>
+                Sugar
+              </Text>
+            </View>
+            
+            <View style={styles.nutrientItem}>
+              <Text style={[styles.nutrientValue, { color: theme.colors.secondary }]}>
+                {foodData.healthScore || 0}/10
+              </Text>
+              <Text style={[styles.nutrientLabel, { color: theme.colors.secondaryText }]}>
+                Health
+              </Text>
+            </View>
+          </View>
+        </View>
+        
+        {/* Description */}
+        {foodData.description && (
+          <View style={styles.descriptionContainer}>
+            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+              Description
+            </Text>
+            <Text style={[styles.description, { color: theme.colors.secondaryText }]}>
+              {foodData.description}
+            </Text>
+          </View>
+        )}
+        
+        {/* Tips */}
+        {foodData.tips && (
+          <View style={styles.tipsContainer}>
+            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+              Tips
+            </Text>
+            <Text style={[styles.tips, { color: theme.colors.secondaryText }]}>
               {foodData.tips}
             </Text>
           </View>
-        </Animatable.View>
-      )}
-      
-      {/* Meal Type Selection */}
-      <Animatable.View animation="fadeIn" duration={600} delay={400}>
-        <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-          Meal Type
-        </Text>
+        )}
+        
+        {/* Meal Type */}
         <View style={styles.mealTypeContainer}>
-          {mealTypes.map((type) => (
-            <TouchableOpacity
-              key={type.id}
-              style={[
-                styles.mealTypeButton,
-                {
-                  backgroundColor:
-                    selectedMealType === type.id
-                      ? getMealTypeColor(type.id) + '20'
-                      : theme.colors.surface,
-                  borderColor:
-                    selectedMealType === type.id
-                      ? getMealTypeColor(type.id)
-                      : theme.colors.border,
-                },
-              ]}
-              onPress={() => setSelectedMealType(type.id)}
-            >
-              <Icon
-                name={getMealTypeIcon(type.id)}
-                size={18}
-                color={
-                  selectedMealType === type.id
-                    ? getMealTypeColor(type.id)
-                    : theme.colors.text
-                }
-                style={styles.mealTypeIcon}
-              />
-              <Text
+          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+            Meal Type
+          </Text>
+          
+          <View style={[styles.mealTypeSelector, { backgroundColor: theme.colors.surfaceHighlight }]}>
+            {['Breakfast', 'Lunch', 'Dinner', 'Snack'].map((meal) => (
+              <TouchableOpacity
+                key={meal}
                 style={[
-                  styles.mealTypeText,
-                  {
-                    color:
-                      selectedMealType === type.id
-                        ? getMealTypeColor(type.id)
-                        : theme.colors.text,
-                  },
+                  styles.mealTypeOption,
+                  { 
+                    backgroundColor: 
+                      foodData.mealType?.toLowerCase() === meal.toLowerCase() 
+                        ? theme.colors.primary 
+                        : 'transparent' 
+                  }
                 ]}
+                onPress={() => {
+                  if (onAdjust) {
+                    onAdjust({
+                      ...foodData,
+                      mealType: meal.toLowerCase(),
+                    });
+                  }
+                }}
               >
-                {type.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
+                <Text 
+                  style={[
+                    styles.mealTypeText, 
+                    { 
+                      color: foodData.mealType?.toLowerCase() === meal.toLowerCase() 
+                        ? '#FFFFFF' 
+                        : theme.colors.text 
+                    }
+                  ]}
+                >
+                  {meal}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
         </View>
-      </Animatable.View>
+      </ScrollView>
       
-      {/* Action Buttons */}
-      <Animatable.View animation="fadeIn" duration={600} delay={500}>
+      {/* Actions */}
+      <View 
+        style={[
+          styles.actionContainer,
+          { borderTopColor: theme.colors.border }
+        ]}
+      >
         <TouchableOpacity
-          style={[
-            styles.saveButton,
-            { backgroundColor: theme.colors.primary },
-          ]}
-          onPress={isEditing ? handleSaveEdited : handleSave}
+          style={[styles.adjustButton, { backgroundColor: theme.colors.surfaceHighlight }]}
+          onPress={() => onAdjust && onAdjust(foodData)}
         >
-          <Icon name="check" size={20} color="#FFFFFF" style={styles.saveButtonIcon} />
-          <Text style={styles.saveButtonText}>
-            {isEditing ? 'Save Changes' : 'Add to Food Log'}
+          <Icon name="edit-2" size={16} color={theme.colors.text} style={styles.actionIcon} />
+          <Text style={[styles.adjustButtonText, { color: theme.colors.text }]}>
+            Adjust
           </Text>
         </TouchableOpacity>
         
         <TouchableOpacity
-          style={[
-            styles.cancelButton,
-            {
-              backgroundColor: theme.colors.surface,
-              borderColor: theme.colors.border,
-            },
-          ]}
-          onPress={onCancel}
+          style={[styles.saveButton, { backgroundColor: theme.colors.primary }]}
+          onPress={() => onSave && onSave(foodData)}
         >
-          <Text style={[styles.cancelButtonText, { color: theme.colors.text }]}>
-            Cancel
+          <Icon name="check" size={16} color="#FFFFFF" style={styles.actionIcon} />
+          <Text style={styles.saveButtonText}>
+            Save
           </Text>
         </TouchableOpacity>
-      </Animatable.View>
-    </ScrollView>
+      </View>
+    </Animatable.View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
-  },
-  contentContainer: {
-    padding: 20,
-    paddingBottom: 40,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingTop: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -3 },
+    shadowOpacity: 0.1,
+    shadowRadius: 5,
+    elevation: 10,
+    maxHeight: '90%',
   },
   header: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
   },
-  backButton: {
-    padding: 8,
-  },
-  headerTitle: {
-    flex: 1,
-    fontSize: 20,
+  title: {
+    fontSize: 18,
     fontWeight: 'bold',
-    textAlign: 'center',
   },
-  editButton: {
-    padding: 8,
+  scrollContainer: {
+    maxHeight: '100%',
+  },
+  foodInfoContainer: {
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   foodName: {
     fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 20,
-  },
-  nutritionContainer: {
-    marginBottom: 24,
-  },
-  nutritionRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  nutritionItem: {
-    alignItems: 'center',
     flex: 1,
+    paddingRight: 16,
   },
-  nutritionValue: {
-    fontSize: 18,
+  calorieContainer: {
+    alignItems: 'center',
+  },
+  calorieCount: {
+    fontSize: 26,
     fontWeight: 'bold',
-    marginBottom: 4,
   },
-  nutritionLabel: {
+  calorieUnit: {
     fontSize: 14,
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 10,
-    marginTop: 10,
+  macroChart: {
+    paddingHorizontal: 16,
+    paddingBottom: 16,
   },
-  descriptionText: {
+  macroBarContainer: {
+    flexDirection: 'row',
+    height: 16,
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  macroBarSegment: {
+    height: '100%',
+  },
+  macroLegend: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 8,
+  },
+  macroLegendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  macroLegendColor: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginRight: 6,
+  },
+  macroLegendText: {
+    fontSize: 12,
+  },
+  nutrientSection: {
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+  },
+  sectionTitle: {
     fontSize: 16,
-    lineHeight: 24,
-    marginBottom: 20,
+    fontWeight: 'bold',
+    marginBottom: 8,
+  },
+  nutrientGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginHorizontal: -8,
+  },
+  nutrientItem: {
+    width: '33.33%',
+    paddingHorizontal: 8,
+    marginBottom: 12,
+  },
+  nutrientValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  nutrientLabel: {
+    fontSize: 12,
+  },
+  descriptionContainer: {
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+  },
+  description: {
+    fontSize: 14,
+    lineHeight: 20,
   },
   tipsContainer: {
-    flexDirection: 'row',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 24,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
   },
-  tipsIcon: {
-    marginRight: 12,
-    marginTop: 2,
-  },
-  tipsText: {
-    flex: 1,
+  tips: {
     fontSize: 14,
     lineHeight: 20,
   },
   mealTypeContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    marginBottom: 30,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
   },
-  mealTypeButton: {
+  mealTypeSelector: {
     flexDirection: 'row',
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  mealTypeOption: {
+    flex: 1,
+    paddingVertical: 8,
     alignItems: 'center',
-    borderWidth: 1,
-    borderRadius: 12,
-    paddingVertical: 10,
-    paddingHorizontal: 14,
-    minWidth: '48%',
-    marginBottom: 10,
-  },
-  mealTypeIcon: {
-    marginRight: 8,
   },
   mealTypeText: {
-    fontSize: 14,
     fontWeight: '500',
+    fontSize: 14,
+  },
+  actionContainer: {
+    flexDirection: 'row',
+    padding: 16,
+    borderTopWidth: 1,
+  },
+  adjustButton: {
+    flex: 1,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+    flexDirection: 'row',
   },
   saveButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flex: 2,
+    height: 48,
+    borderRadius: 24,
     justifyContent: 'center',
-    padding: 16,
-    borderRadius: 12,
-    marginBottom: 12,
+    alignItems: 'center',
+    flexDirection: 'row',
   },
-  saveButtonIcon: {
+  actionIcon: {
     marginRight: 8,
+  },
+  adjustButtonText: {
+    fontWeight: '600',
+    fontSize: 16,
   },
   saveButtonText: {
     color: '#FFFFFF',
-    fontSize: 16,
     fontWeight: '600',
-  },
-  cancelButton: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
-  cancelButtonText: {
     fontSize: 16,
-    fontWeight: '500',
-  },
-  editableNutritionContainer: {
-    marginBottom: 24,
-  },
-  editRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  editLabel: {
-    width: 100,
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  editInput: {
-    flex: 1,
-    height: 40,
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
   },
 });
 

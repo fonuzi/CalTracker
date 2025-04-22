@@ -2,89 +2,115 @@
  * Typography definitions for the app
  */
 
-export const typography = {
-  // Font sizes
-  fontSize: {
-    xs: 12,
-    sm: 14,
-    md: 16,
-    lg: 18,
-    xl: 20,
-    xxl: 24,
-    xxxl: 28,
+export const fontSizes = {
+  xs: 12,
+  sm: 14,
+  md: 16,
+  lg: 18,
+  xl: 20,
+  xxl: 24,
+  xxxl: 32,
+};
+
+export const lineHeights = {
+  xs: 16,
+  sm: 20,
+  md: 24,
+  lg: 28,
+  xl: 32,
+  xxl: 36,
+  xxxl: 48,
+};
+
+export const fonts = {
+  regular: {
+    fontFamily: 'System',
+    fontWeight: '400',
   },
-  
-  // Font weights
-  fontWeight: {
-    regular: '400',
-    medium: '500',
-    semiBold: '600',
-    bold: '700',
+  medium: {
+    fontFamily: 'System',
+    fontWeight: '500',
   },
-  
-  // Line heights
-  lineHeight: {
-    tight: 1.25,
-    normal: 1.5,
-    relaxed: 1.75,
-  },
-  
-  // Letter spacing
-  letterSpacing: {
-    tight: -0.5,
-    normal: 0,
-    wide: 0.5,
+  bold: {
+    fontFamily: 'System',
+    fontWeight: '700',
   },
 };
 
-// Common text styles that can be reused throughout the app
-export const textStyles = {
-  header: {
-    fontSize: typography.fontSize.xxxl,
-    fontWeight: typography.fontWeight.bold,
-    lineHeight: typography.lineHeight.tight,
+export const typography = {
+  h1: {
+    ...fonts.bold,
+    fontSize: fontSizes.xxxl,
+    lineHeight: lineHeights.xxxl,
   },
-  
-  subheader: {
-    fontSize: typography.fontSize.xxl,
-    fontWeight: typography.fontWeight.semiBold,
-    lineHeight: typography.lineHeight.tight,
+  h2: {
+    ...fonts.bold,
+    fontSize: fontSizes.xxl,
+    lineHeight: lineHeights.xxl,
   },
-  
-  title: {
-    fontSize: typography.fontSize.xl,
-    fontWeight: typography.fontWeight.bold,
-    lineHeight: typography.lineHeight.normal,
+  h3: {
+    ...fonts.bold,
+    fontSize: fontSizes.xl,
+    lineHeight: lineHeights.xl,
   },
-  
-  subtitle: {
-    fontSize: typography.fontSize.lg,
-    fontWeight: typography.fontWeight.medium,
-    lineHeight: typography.lineHeight.normal,
+  h4: {
+    ...fonts.bold,
+    fontSize: fontSizes.lg,
+    lineHeight: lineHeights.lg,
   },
-  
-  body: {
-    fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.regular,
-    lineHeight: typography.lineHeight.relaxed,
+  h5: {
+    ...fonts.medium,
+    fontSize: fontSizes.md,
+    lineHeight: lineHeights.md,
   },
-  
-  caption: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.regular,
-    lineHeight: typography.lineHeight.normal,
+  body1: {
+    ...fonts.regular,
+    fontSize: fontSizes.md,
+    lineHeight: lineHeights.md,
   },
-  
+  body2: {
+    ...fonts.regular,
+    fontSize: fontSizes.sm,
+    lineHeight: lineHeights.sm,
+  },
   button: {
-    fontSize: typography.fontSize.md,
-    fontWeight: typography.fontWeight.semiBold,
-    lineHeight: typography.lineHeight.normal,
-    letterSpacing: typography.letterSpacing.wide,
+    ...fonts.medium,
+    fontSize: fontSizes.md,
+    lineHeight: lineHeights.md,
   },
-  
-  label: {
-    fontSize: typography.fontSize.sm,
-    fontWeight: typography.fontWeight.medium,
-    lineHeight: typography.lineHeight.normal,
+  caption: {
+    ...fonts.regular,
+    fontSize: fontSizes.xs,
+    lineHeight: lineHeights.xs,
+  },
+};
+
+export const textStyles = {
+  h1: {
+    ...typography.h1,
+  },
+  h2: {
+    ...typography.h2,
+  },
+  h3: {
+    ...typography.h3,
+  },
+  h4: {
+    ...typography.h4,
+  },
+  h5: {
+    ...typography.h5,
+  },
+  body1: {
+    ...typography.body1,
+  },
+  body2: {
+    ...typography.body2,
+  },
+  button: {
+    ...typography.button,
+  },
+  caption: {
+    ...typography.caption,
   },
 };

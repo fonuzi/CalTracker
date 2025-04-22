@@ -7,15 +7,10 @@ import { Platform } from 'react-native';
  */
 export const checkHealthKitPermissions = async () => {
   try {
-    // On web, we can't use the Pedometer, so we mock permissions
-    if (Platform.OS === 'web') {
-      return true;
-    }
-    
-    const { status } = await Pedometer.getPermissionsAsync();
-    return status === 'granted';
+    const isAvailable = await Pedometer.isAvailableAsync();
+    return isAvailable;
   } catch (error) {
-    console.error('Error checking health kit permissions:', error);
+    console.error('Error checking pedometer availability:', error);
     return false;
   }
 };
@@ -26,15 +21,26 @@ export const checkHealthKitPermissions = async () => {
  */
 export const requestHealthKitPermissions = async () => {
   try {
-    // On web, we can't use the Pedometer, so we mock permissions
-    if (Platform.OS === 'web') {
-      return true;
+    // Check if pedometer is available
+    const isAvailable = await Pedometer.isAvailableAsync();
+    
+    if (!isAvailable) {
+      console.warn('Pedometer is not available on this device');
+      return false;
     }
     
-    const { status } = await Pedometer.requestPermissionsAsync();
-    return status === 'granted';
+    // On iOS, we should request permissions
+    // On Android and web, this isn't necessary
+    if (Platform.OS === 'ios') {
+      // iOS-specific permission request
+      const { granted } = await Pedometer.requestPermissionsAsync();
+      return granted;
+    }
+    
+    // For other platforms, assume permission is granted
+    return true;
   } catch (error) {
-    console.error('Error requesting health kit permissions:', error);
+    console.error('Error requesting pedometer permissions:', error);
     return false;
   }
 };
@@ -45,20 +51,20 @@ export const requestHealthKitPermissions = async () => {
  */
 export const getStepsForToday = async () => {
   try {
-    // On web, we can't use the Pedometer, so we return a mock step count
-    if (Platform.OS === 'web') {
+    // Check if pedometer is available
+    const isAvailable = await Pedometer.isAvailableAsync();
+    
+    if (!isAvailable) {
+      console.warn('Pedometer is not available, using mock data');
       return getMockStepsForToday();
     }
     
+    // Calculate today's beginning and end
     const now = new Date();
     const start = new Date();
     start.setHours(0, 0, 0, 0);
     
-    const isAvailable = await Pedometer.isAvailableAsync();
-    if (!isAvailable) {
-      return getMockStepsForToday();
-    }
-    
+    // Get step count
     const { steps } = await Pedometer.getStepCountAsync(start, now);
     return steps;
   } catch (error) {
@@ -73,50 +79,48 @@ export const getStepsForToday = async () => {
  */
 export const getStepsForPastWeek = async () => {
   try {
-    // On web, we can't use the Pedometer, so we return mock step counts
-    if (Platform.OS === 'web') {
-      return getMockStepsForPastWeek();
-    }
-    
+    // Check if pedometer is available
     const isAvailable = await Pedometer.isAvailableAsync();
+    
     if (!isAvailable) {
+      console.warn('Pedometer is not available, using mock data');
       return getMockStepsForPastWeek();
     }
     
+    // Calculate dates for the past week
     const now = new Date();
-    const result = [];
+    const endDate = new Date(now);
+    endDate.setHours(23, 59, 59, 999);
     
-    // Get steps for each day of the past week
-    for (let i = 6; i >= 0; i--) {
-      const start = new Date();
-      start.setHours(0, 0, 0, 0);
-      start.setDate(start.getDate() - i);
+    const startDate = new Date(now);
+    startDate.setDate(startDate.getDate() - 6);
+    startDate.setHours(0, 0, 0, 0);
+    
+    // Create an array of day objects
+    const days = [];
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(startDate);
+      date.setDate(date.getDate() + i);
       
-      const end = new Date(start);
-      end.setHours(23, 59, 59, 999);
-      
-      // Make sure we don't get steps for the future
-      const endTime = end.getTime() > now.getTime() ? now : end;
+      const nextDate = new Date(date);
+      nextDate.setDate(nextDate.getDate() + 1);
       
       try {
-        const { steps } = await Pedometer.getStepCountAsync(start, endTime);
-        result.push({
-          date: start.toISOString().split('T')[0],
-          steps,
+        const { steps } = await Pedometer.getStepCountAsync(date, nextDate);
+        days.push({
+          date: date.toISOString().split('T')[0],
+          steps: steps,
         });
       } catch (error) {
-        console.error(`Error getting steps for day -${i}:`, error);
-        
-        // Add mock data for this day
-        const mockSteps = Math.floor(Math.random() * 3000) + 3000;
-        result.push({
-          date: start.toISOString().split('T')[0],
-          steps: mockSteps,
+        console.error(`Error getting steps for ${date.toISOString().split('T')[0]}:`, error);
+        days.push({
+          date: date.toISOString().split('T')[0],
+          steps: 0,
         });
       }
     }
     
-    return result;
+    return days;
   } catch (error) {
     console.error('Error getting steps for past week:', error);
     return getMockStepsForPastWeek();
@@ -129,39 +133,33 @@ export const getStepsForPastWeek = async () => {
  * @returns {Object} Subscription object with remove() method
  */
 export const subscribeToStepUpdates = (callback) => {
-  // On web, we can't use the Pedometer, so we create a mock subscription
+  // Check if we're on web (Pedometer subscription is not supported on web)
   if (Platform.OS === 'web') {
+    console.warn('Pedometer subscription not supported on web, using mock subscription');
     return createMockStepSubscription(callback);
   }
   
-  // Check if pedometer is available
-  Pedometer.isAvailableAsync().then((isAvailable) => {
-    if (!isAvailable) {
-      return createMockStepSubscription(callback);
-    }
+  try {
+    // Check if pedometer is available (async, but we'll handle errors in the subscription)
+    Pedometer.isAvailableAsync()
+      .then(isAvailable => {
+        if (!isAvailable) {
+          console.warn('Pedometer is not available, using mock subscription');
+          return createMockStepSubscription(callback);
+        }
+      })
+      .catch(error => {
+        console.error('Error checking pedometer availability:', error);
+        return createMockStepSubscription(callback);
+      });
     
-    // Get steps for today so far
-    const now = new Date();
+    // Subscribe to pedometer updates
     const start = new Date();
     start.setHours(0, 0, 0, 0);
     
-    Pedometer.getStepCountAsync(start, now)
-      .then(({ steps }) => {
-        callback(steps);
-      })
-      .catch((error) => {
-        console.error('Error getting initial step count:', error);
-        callback(getMockStepsForToday());
-      });
-  });
-  
-  // Subscribe to pedometer updates
-  try {
-    const subscription = Pedometer.watchStepCount((result) => {
+    return Pedometer.watchStepCount(result => {
       callback(result.steps);
     });
-    
-    return subscription;
   } catch (error) {
     console.error('Error subscribing to step updates:', error);
     return createMockStepSubscription(callback);
@@ -175,18 +173,26 @@ export const subscribeToStepUpdates = (callback) => {
  * @private
  */
 const createMockStepSubscription = (callback) => {
-  // Get random step count between 3000 and 10000
-  const steps = getMockStepsForToday();
-  callback(steps);
+  // Start with a mock step count
+  let mockSteps = getMockStepsForToday();
   
-  // Simulate step count updates every 60 seconds
+  // Call the callback with the initial step count
+  setTimeout(() => {
+    callback(mockSteps);
+  }, 1000);
+  
+  // Set up an interval to simulate step count updates
   const interval = setInterval(() => {
-    const newSteps = steps + Math.floor(Math.random() * 100);
-    callback(newSteps);
-  }, 60000);
+    // Increment the step count by a random number (0-5)
+    mockSteps += Math.floor(Math.random() * 6);
+    callback(mockSteps);
+  }, 10000); // Update every 10 seconds
   
+  // Return a mock subscription object with a remove method
   return {
-    remove: () => clearInterval(interval),
+    remove: () => {
+      clearInterval(interval);
+    }
   };
 };
 
@@ -196,16 +202,8 @@ const createMockStepSubscription = (callback) => {
  * @private
  */
 const getMockStepsForToday = () => {
-  // Get current hour
-  const hour = new Date().getHours();
-  
-  // Calculate steps based on time of day (more steps later in the day)
-  const baseSteps = 5000; // Average daily steps
-  const progressFactor = Math.min(1, hour / 21); // Progress through the day (max at 9 PM)
-  
-  const randomVariation = Math.random() * 0.2 - 0.1; // +/- 10% variation
-  
-  return Math.round(baseSteps * progressFactor * (1 + randomVariation));
+  // Generate a random number between 5000 and 10000
+  return Math.floor(Math.random() * (10000 - 5000 + 1)) + 5000;
 };
 
 /**
@@ -214,21 +212,18 @@ const getMockStepsForToday = () => {
  * @private
  */
 const getMockStepsForPastWeek = () => {
-  const result = [];
+  const days = [];
   const now = new Date();
   
-  for (let i = 6; i >= 0; i--) {
-    const date = new Date();
-    date.setDate(date.getDate() - i);
+  for (let i = 0; i < 7; i++) {
+    const date = new Date(now);
+    date.setDate(date.getDate() - (6 - i));
     
-    // Generate random step count between 3000 and 10000
-    const steps = Math.floor(Math.random() * 7000) + 3000;
-    
-    result.push({
+    days.push({
       date: date.toISOString().split('T')[0],
-      steps,
+      steps: Math.floor(Math.random() * (12000 - 3000 + 1)) + 3000,
     });
   }
   
-  return result;
+  return days;
 };

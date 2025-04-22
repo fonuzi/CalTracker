@@ -1,10 +1,13 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Storage keys
-const PROFILE_KEY = 'nutritrack_profile';
-const FOOD_LOG_KEY = 'nutritrack_food_log';
-const FOOD_LOG_DATES_KEY = 'nutritrack_food_log_dates';
-const SETTINGS_KEY = 'nutritrack_settings';
+const KEYS = {
+  USER_PROFILE: 'nutritrack_user_profile',
+  FOOD_LOGS_PREFIX: 'nutritrack_food_logs_',
+  FOOD_LOG_DATES: 'nutritrack_food_log_dates',
+  APP_SETTINGS: 'nutritrack_app_settings',
+  ONBOARDING_COMPLETED: 'nutritrack_onboarding_completed',
+};
 
 /**
  * Saves a user profile to local storage
@@ -13,7 +16,7 @@ const SETTINGS_KEY = 'nutritrack_settings';
  */
 export const saveUserProfile = async (profile) => {
   try {
-    await AsyncStorage.setItem(PROFILE_KEY, JSON.stringify(profile));
+    await AsyncStorage.setItem(KEYS.USER_PROFILE, JSON.stringify(profile));
   } catch (error) {
     console.error('Error saving user profile:', error);
     throw error;
@@ -26,7 +29,7 @@ export const saveUserProfile = async (profile) => {
  */
 export const getUserProfile = async () => {
   try {
-    const profileJson = await AsyncStorage.getItem(PROFILE_KEY);
+    const profileJson = await AsyncStorage.getItem(KEYS.USER_PROFILE);
     return profileJson ? JSON.parse(profileJson) : null;
   } catch (error) {
     console.error('Error getting user profile:', error);
@@ -41,34 +44,32 @@ export const getUserProfile = async () => {
  */
 export const saveFoodLog = async (food) => {
   try {
-    // Make sure food has an ID
-    if (!food.id) {
-      food.id = generateId();
+    // Ensure food has required properties
+    if (!food.id || !food.timestamp) {
+      throw new Error('Food log entry must have id and timestamp');
     }
     
-    // Add timestamp if not present
-    if (!food.timestamp) {
-      food.timestamp = new Date().toISOString();
-    }
-    
-    // Get the date portion of the timestamp (YYYY-MM-DD)
+    // Extract date from timestamp (YYYY-MM-DD)
     const date = food.timestamp.split('T')[0];
     
-    // Get existing logs for this date
-    const existingLogs = await getFoodLogs(date);
+    // Get existing logs for the date
+    const existingLogsJson = await AsyncStorage.getItem(`${KEYS.FOOD_LOGS_PREFIX}${date}`);
+    const existingLogs = existingLogsJson ? JSON.parse(existingLogsJson) : [];
     
-    // Add or update the food log
-    const updatedLogs = existingLogs.find((log) => log.id === food.id)
-      ? existingLogs.map((log) => (log.id === food.id ? food : log))
-      : [...existingLogs, food];
+    // Check if the food entry already exists
+    const foodIndex = existingLogs.findIndex(item => item.id === food.id);
     
-    // Save updated logs
-    await AsyncStorage.setItem(
-      `${FOOD_LOG_KEY}_${date}`,
-      JSON.stringify(updatedLogs)
-    );
+    // Update or add the food entry
+    if (foodIndex !== -1) {
+      existingLogs[foodIndex] = food;
+    } else {
+      existingLogs.push(food);
+    }
     
-    // Update the list of dates that have food logs
+    // Save the updated logs
+    await AsyncStorage.setItem(`${KEYS.FOOD_LOGS_PREFIX}${date}`, JSON.stringify(existingLogs));
+    
+    // Update the list of dates with food logs
     await updateFoodLogDates(date);
   } catch (error) {
     console.error('Error saving food log:', error);
@@ -83,7 +84,7 @@ export const saveFoodLog = async (food) => {
  */
 export const getFoodLogs = async (date) => {
   try {
-    const logsJson = await AsyncStorage.getItem(`${FOOD_LOG_KEY}_${date}`);
+    const logsJson = await AsyncStorage.getItem(`${KEYS.FOOD_LOGS_PREFIX}${date}`);
     return logsJson ? JSON.parse(logsJson) : [];
   } catch (error) {
     console.error('Error getting food logs:', error);
@@ -98,34 +99,24 @@ export const getFoodLogs = async (date) => {
  */
 export const deleteFoodLog = async (id) => {
   try {
-    // Get all dates that have food logs
+    // Get all dates with food logs
     const dates = await getFoodLogDates();
     
-    // For each date, check if the food log exists and delete it
+    // Check each date for the food log entry
     for (const date of dates) {
       const logs = await getFoodLogs(date);
-      const index = logs.findIndex((log) => log.id === id);
+      const filteredLogs = logs.filter(log => log.id !== id);
       
-      if (index !== -1) {
-        // Remove the log
-        logs.splice(index, 1);
+      // If the filtered logs array is different in length, the entry was found and removed
+      if (filteredLogs.length !== logs.length) {
+        await AsyncStorage.setItem(`${KEYS.FOOD_LOGS_PREFIX}${date}`, JSON.stringify(filteredLogs));
         
-        // Save updated logs
-        await AsyncStorage.setItem(
-          `${FOOD_LOG_KEY}_${date}`,
-          JSON.stringify(logs)
-        );
-        
-        // If there are no more logs for this date, remove it from the list
-        if (logs.length === 0) {
-          const updatedDates = dates.filter((d) => d !== date);
-          await AsyncStorage.setItem(
-            FOOD_LOG_DATES_KEY,
-            JSON.stringify(updatedDates)
-          );
+        // If there are no more logs for this date, remove the date from the list
+        if (filteredLogs.length === 0) {
+          const updatedDates = dates.filter(d => d !== date);
+          await AsyncStorage.setItem(KEYS.FOOD_LOG_DATES, JSON.stringify(updatedDates));
         }
         
-        // Log was found and deleted, so we can stop searching
         break;
       }
     }
@@ -141,7 +132,7 @@ export const deleteFoodLog = async (id) => {
  */
 export const getFoodLogDates = async () => {
   try {
-    const datesJson = await AsyncStorage.getItem(FOOD_LOG_DATES_KEY);
+    const datesJson = await AsyncStorage.getItem(KEYS.FOOD_LOG_DATES);
     return datesJson ? JSON.parse(datesJson) : [];
   } catch (error) {
     console.error('Error getting food log dates:', error);
@@ -157,11 +148,14 @@ export const getFoodLogDates = async () => {
  */
 const updateFoodLogDates = async (date) => {
   try {
-    const dates = await getFoodLogDates();
+    const datesJson = await AsyncStorage.getItem(KEYS.FOOD_LOG_DATES);
+    const dates = datesJson ? JSON.parse(datesJson) : [];
     
+    // Add the date if it's not already in the list
     if (!dates.includes(date)) {
       dates.push(date);
-      await AsyncStorage.setItem(FOOD_LOG_DATES_KEY, JSON.stringify(dates));
+      dates.sort(); // Keep dates in chronological order
+      await AsyncStorage.setItem(KEYS.FOOD_LOG_DATES, JSON.stringify(dates));
     }
   } catch (error) {
     console.error('Error updating food log dates:', error);
@@ -177,23 +171,18 @@ const updateFoodLogDates = async (date) => {
  */
 export const getFoodLogsForDateRange = async (startDate, endDate) => {
   try {
-    const start = new Date(startDate);
-    const end = new Date(endDate);
     const result = {};
-    
-    // Get all dates that have food logs
     const allDates = await getFoodLogDates();
     
-    // Filter dates within the range
-    const datesInRange = allDates.filter((date) => {
-      const current = new Date(date);
-      return current >= start && current <= end;
-    });
+    // Filter dates in the requested range
+    const datesInRange = allDates.filter(date => date >= startDate && date <= endDate);
     
     // Get logs for each date
     for (const date of datesInRange) {
       const logs = await getFoodLogs(date);
-      result[date] = logs;
+      if (logs.length > 0) {
+        result[date] = logs;
+      }
     }
     
     return result;
@@ -210,7 +199,7 @@ export const getFoodLogsForDateRange = async (startDate, endDate) => {
  */
 export const saveAppSettings = async (settings) => {
   try {
-    await AsyncStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+    await AsyncStorage.setItem(KEYS.APP_SETTINGS, JSON.stringify(settings));
   } catch (error) {
     console.error('Error saving app settings:', error);
     throw error;
@@ -223,13 +212,52 @@ export const saveAppSettings = async (settings) => {
  */
 export const getAppSettings = async () => {
   try {
-    const settingsJson = await AsyncStorage.getItem(SETTINGS_KEY);
-    return settingsJson
-      ? JSON.parse(settingsJson)
-      : { darkMode: true, notifications: true };
+    const settingsJson = await AsyncStorage.getItem(KEYS.APP_SETTINGS);
+    return settingsJson ? JSON.parse(settingsJson) : {
+      darkMode: true,
+      notifications: true,
+      onboardingComplete: false,
+    };
   } catch (error) {
     console.error('Error getting app settings:', error);
-    return { darkMode: true, notifications: true };
+    return {
+      darkMode: true,
+      notifications: true,
+      onboardingComplete: false,
+    };
+  }
+};
+
+/**
+ * Saves onboarding completion status
+ * @param {boolean} completed - Whether onboarding is completed
+ * @returns {Promise<void>}
+ */
+export const saveOnboardingStatus = async (completed) => {
+  try {
+    await AsyncStorage.setItem(KEYS.ONBOARDING_COMPLETED, JSON.stringify(completed));
+    
+    // Also update app settings
+    const settings = await getAppSettings();
+    settings.onboardingComplete = completed;
+    await saveAppSettings(settings);
+  } catch (error) {
+    console.error('Error saving onboarding status:', error);
+    throw error;
+  }
+};
+
+/**
+ * Gets onboarding completion status
+ * @returns {Promise<boolean>} Whether onboarding is completed
+ */
+export const getOnboardingStatus = async () => {
+  try {
+    const statusJson = await AsyncStorage.getItem(KEYS.ONBOARDING_COMPLETED);
+    return statusJson ? JSON.parse(statusJson) : false;
+  } catch (error) {
+    console.error('Error getting onboarding status:', error);
+    return false;
   }
 };
 
@@ -239,11 +267,16 @@ export const getAppSettings = async () => {
  */
 export const clearAllData = async () => {
   try {
+    // Get all keys
     const keys = await AsyncStorage.getAllKeys();
-    const nutritrackKeys = keys.filter((key) => key.startsWith('nutritrack_'));
-    await AsyncStorage.multiRemove(nutritrackKeys);
+    
+    // Filter app-specific keys
+    const appKeys = keys.filter(key => key.startsWith('nutritrack_'));
+    
+    // Clear all app-specific keys
+    await AsyncStorage.multiRemove(appKeys);
   } catch (error) {
-    console.error('Error clearing app data:', error);
+    console.error('Error clearing all data:', error);
     throw error;
   }
 };

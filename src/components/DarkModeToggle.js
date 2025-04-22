@@ -1,53 +1,33 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { TouchableOpacity, StyleSheet, View, Animated } from 'react-native';
 import { Icon } from '../assets/icons';
-import * as Animatable from 'react-native-animatable';
 
 /**
  * A component to toggle between dark and light mode
  * @param {boolean} isDarkMode - Whether dark mode is currently enabled
  * @param {Function} onToggle - Function to call when the toggle is pressed
  */
-const DarkModeToggle = ({ isDarkMode, onToggle, theme }) => {
+const DarkModeToggle = ({ isDarkMode, onToggle, style }) => {
   return (
-    <TouchableOpacity
+    <TouchableOpacity 
       style={[
-        styles.container,
-        {
-          backgroundColor: theme.colors.surface,
-          borderColor: theme.colors.border,
-        },
+        styles.container, 
+        isDarkMode ? styles.darkMode : styles.lightMode,
+        style
       ]}
       onPress={onToggle}
       activeOpacity={0.7}
     >
-      <Animatable.View
-        animation={isDarkMode ? 'fadeIn' : 'fadeOut'}
-        duration={300}
-        style={[styles.iconContainer, styles.darkIcon, { opacity: isDarkMode ? 1 : 0 }]}
-      >
-        <Icon name="moon" size={18} color="#FFFFFF" />
-      </Animatable.View>
-      
-      <Animatable.View
-        animation={!isDarkMode ? 'fadeIn' : 'fadeOut'}
-        duration={300}
-        style={[styles.iconContainer, styles.lightIcon, { opacity: !isDarkMode ? 1 : 0 }]}
-      >
-        <Icon name="sun" size={18} color="#FFFFFF" />
-      </Animatable.View>
-      
-      <Animatable.View
-        animation={isDarkMode ? 'slideInRight' : 'slideInLeft'}
-        duration={300}
-        style={[
-          styles.toggle,
-          {
-            transform: [{ translateX: isDarkMode ? 28 : 0 }],
-            backgroundColor: isDarkMode ? '#2C2C2E' : '#FFDE59',
-          },
-        ]}
-      />
+      <View style={[
+        styles.handle,
+        isDarkMode ? styles.handleRight : styles.handleLeft
+      ]}>
+        <Icon 
+          name={isDarkMode ? 'moon' : 'sun'} 
+          size={16}
+          color={isDarkMode ? '#FFFFFF' : '#FFC107'}
+        />
+      </View>
     </TouchableOpacity>
   );
 };
@@ -55,36 +35,34 @@ const DarkModeToggle = ({ isDarkMode, onToggle, theme }) => {
 const styles = StyleSheet.create({
   container: {
     width: 60,
-    height: 32,
-    borderRadius: 16,
-    padding: 2,
-    flexDirection: 'row',
-    position: 'relative',
+    height: 30,
+    borderRadius: 15,
+    padding: 4,
+  },
+  darkMode: {
+    backgroundColor: '#1E1E1E',
+    borderColor: '#4A80F0',
     borderWidth: 1,
   },
-  toggle: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    position: 'absolute',
-    top: 1,
-    left: 1,
+  lightMode: {
+    backgroundColor: '#F0F3F9',
+    borderColor: '#E5E5E5',
+    borderWidth: 1,
   },
-  iconContainer: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+  handle: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
     justifyContent: 'center',
     alignItems: 'center',
-    position: 'absolute',
-    top: 1,
-    zIndex: 1,
   },
-  darkIcon: {
-    right: 1,
+  handleLeft: {
+    backgroundColor: '#FFFFFF',
+    alignSelf: 'flex-start',
   },
-  lightIcon: {
-    left: 1,
+  handleRight: {
+    backgroundColor: '#121212',
+    alignSelf: 'flex-end',
   },
 });
 

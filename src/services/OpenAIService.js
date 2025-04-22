@@ -1,11 +1,27 @@
 import * as FileSystem from 'expo-file-system';
 import OpenAI from 'openai';
+import { suggestMealTypeByTime } from '../utils/foodAnalysis';
 
-// Initialize OpenAI client
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-  dangerouslyAllowBrowser: true, // Allow running in browser/client for demo purposes
-});
+// Initialize OpenAI client with proper error handling
+let openaiClient = null;
+let apiKeyMissing = false;
+
+try {
+  const apiKey = process.env.OPENAI_API_KEY;
+  
+  if (apiKey && apiKey.length > 0) {
+    openaiClient = new OpenAI({
+      apiKey: apiKey,
+      dangerouslyAllowBrowser: true, // Allow running in browser/client for demo purposes
+    });
+  } else {
+    apiKeyMissing = true;
+    console.warn('OpenAI API key is missing or empty');
+  }
+} catch (error) {
+  apiKeyMissing = true;
+  console.warn('Failed to initialize OpenAI client:', error.message);
+}
 
 // The system prompt template for food analysis
 const FOOD_ANALYSIS_PROMPT = `
@@ -53,7 +69,7 @@ Consider visible preparation methods (fried, grilled, etc.) in your analysis.
 export const analyzeFoodImage = async (imageUri) => {
   try {
     // Check if OpenAI API key is available
-    if (!process.env.OPENAI_API_KEY) {
+    if (apiKeyMissing || !openaiClient) {
       console.warn('OpenAI API key not available, using demo data');
       return getDemoFoodData('image');
     }
@@ -104,13 +120,13 @@ export const analyzeFoodImage = async (imageUri) => {
 export const analyzeFoodText = async (text) => {
   try {
     // Check if OpenAI API key is available
-    if (!process.env.OPENAI_API_KEY) {
+    if (apiKeyMissing || !openaiClient) {
       console.warn('OpenAI API key not available, using demo data');
       return getDemoFoodData('text', text);
     }
     
     // Call OpenAI to analyze the text
-    const response = await openai.chat.completions.create({
+    const response = await openaiClient.chat.completions.create({
       model: "gpt-4o", // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
       messages: [
         { role: "system", content: TEXT_ANALYSIS_PROMPT },
@@ -145,6 +161,54 @@ export const analyzeFoodText = async (text) => {
 };
 
 /**
+ * Process the food image using OpenAI Vision API
+ * @param {string} base64Image - Base64 encoded image
+ * @returns {Promise<Object>} Nutritional information
+ * @private
+ */
+const processFoodImage = async (base64Image) => {
+  try {
+    // Call OpenAI Vision API
+    const response = await openaiClient.chat.completions.create({
+      model: "gpt-4o", // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
+      messages: [
+        {
+          role: "system",
+          content: IMAGE_ANALYSIS_PROMPT
+        },
+        {
+          role: "user",
+          content: [
+            { type: "text", text: "Analyze this food image and provide nutritional information:" },
+            {
+              type: "image_url",
+              image_url: {
+                url: `data:image/jpeg;base64,${base64Image}`
+              }
+            }
+          ]
+        }
+      ],
+      response_format: { type: "json_object" },
+      max_tokens: 1000,
+    });
+    
+    // Parse the response
+    const result = JSON.parse(response.choices[0].message.content);
+    
+    // Suggest meal type based on time if not provided
+    if (!result.mealType) {
+      result.mealType = suggestMealTypeByTime();
+    }
+    
+    return result;
+  } catch (error) {
+    console.error('Error processing food image:', error);
+    throw error;
+  }
+};
+
+/**
  * Analyzes user fitness data to provide personalized recommendations
  * @param {Object} userData - User fitness and profile data
  * @returns {Promise<Object>} Personalized recommendations
@@ -152,7 +216,7 @@ export const analyzeFoodText = async (text) => {
 export const analyzeFitnessGoals = async (userData) => {
   try {
     // Check if OpenAI API key is available
-    if (!process.env.OPENAI_API_KEY) {
+    if (apiKeyMissing || !openaiClient) {
       console.warn('OpenAI API key not available, using demo data');
       return getDemoFitnessRecommendations(userData);
     }
@@ -161,7 +225,7 @@ export const analyzeFitnessGoals = async (userData) => {
     const userDataString = JSON.stringify(userData, null, 2);
     
     // Call OpenAI to analyze the user's fitness data
-    const response = await openai.chat.completions.create({
+    const response = await openaiClient.chat.completions.create({
       model: "gpt-4o", // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
       messages: [
         {
@@ -343,11 +407,12 @@ const getDemoFoodDataFromText = (text) => {
       calories: 300,
       protein: 15,
       carbs: 30,
-      fat: 15,
-      fiber: 3,
+      fat: 10,
+      fiber: 2,
       sugar: 5,
-      description: "Food based on your description.",
-      tips: "For more accurate nutrition information, try providing more details about ingredients and portions."
+      healthScore: 6,
+      description: "Food item with estimated nutritional values.",
+      tips: "For more accurate nutrition tracking, provide more details about ingredients and portion sizes."
     };
   }
   
@@ -366,106 +431,44 @@ const getDemoFitnessRecommendations = (userData) => {
   // Base recommendations
   const recommendations = {
     nutritionTips: [
-      "Stay hydrated by drinking at least 8 glasses of water daily",
-      "Include a source of protein with each meal",
-      "Aim for 5 servings of fruits and vegetables daily"
+      "Aim to eat a variety of colorful vegetables with each meal",
+      "Stay hydrated by drinking water throughout the day",
+      "Include protein with each meal to help with satiety and muscle maintenance"
     ],
     exerciseRecommendations: [
-      "Incorporate at least 150 minutes of moderate activity each week",
-      "Add 2-3 strength training sessions to your weekly routine",
-      "Take short walking breaks throughout the day to reduce sitting time"
+      "Try to accumulate at least 150 minutes of moderate exercise each week",
+      "Include both cardio and strength training in your routine",
+      "Take active breaks during the day if you have a sedentary job"
     ],
     dietaryAdjustments: [
-      "Limit processed foods and added sugars",
-      "Choose whole grains over refined carbohydrates",
-      "Include healthy fats like avocados, nuts, and olive oil"
+      "Be mindful of portion sizes, especially for calorie-dense foods",
+      "Limit added sugars and highly processed foods",
+      "Choose whole grains over refined carbohydrates when possible"
     ],
     weeklyGoals: [
-      "Track your food intake for at least 5 days this week",
-      "Reach your daily step goal at least 4 days this week",
-      "Try one new healthy recipe"
+      "Track your food intake consistently", 
+      "Aim for 8,000-10,000 steps daily",
+      "Prepare healthy meals at home more often than eating out"
     ],
-    motivationalMessage: "Remember that consistency is key! Small, sustainable changes lead to the best long-term results."
+    motivationalMessage: "Small, consistent actions lead to big results over time. Focus on sustainable changes rather than quick fixes!"
   };
   
   // Customize based on fitness goal
   if (fitnessGoal === 'lose') {
-    recommendations.nutritionTips[1] = "Focus on high protein foods to help preserve muscle mass";
-    recommendations.dietaryAdjustments[0] = "Create a modest calorie deficit of 300-500 calories per day";
-    recommendations.weeklyGoals[0] = "Stay within your calorie goal at least 5 days this week";
-    recommendations.motivationalMessage = "Focus on your health improvements, not just the number on the scale. You're making progress every day!";
+    recommendations.nutritionTips.unshift("Create a modest calorie deficit of 300-500 calories per day for sustainable weight loss");
+    recommendations.exerciseRecommendations.unshift("Add an extra 20-30 minutes of cardio 2-3 times per week to support your calorie deficit");
+    recommendations.motivationalMessage = "Weight loss is a journey with ups and downs. Focus on consistency rather than perfection, and celebrate your non-scale victories!";
   } else if (fitnessGoal === 'gain') {
-    recommendations.nutritionTips[1] = "Increase protein intake to support muscle growth";
-    recommendations.dietaryAdjustments[0] = "Aim for a calorie surplus of 300-500 calories per day";
-    recommendations.weeklyGoals[0] = "Meet your calorie and protein goals at least 5 days this week";
-    recommendations.motivationalMessage = "Building strength takes time. Trust the process and stay consistent with your nutrition and training!";
+    recommendations.nutritionTips.unshift("Eat in a slight calorie surplus of 300-500 calories per day to support muscle growth");
+    recommendations.exerciseRecommendations.unshift("Prioritize progressive resistance training 3-4 times per week");
+    recommendations.motivationalMessage = "Building muscle takes time and consistency. Focus on gradually increasing your strength and fueling your body properly!";
+  } else if (fitnessGoal === 'maintain') {
+    recommendations.nutritionTips.unshift("Balance your calorie intake with your energy expenditure to maintain your current weight");
+    recommendations.exerciseRecommendations.unshift("Mix up your exercise routine to keep it interesting and challenge different muscle groups");
+    recommendations.motivationalMessage = "Maintaining a healthy lifestyle is a marathon, not a sprint. Focus on finding sustainable habits you enjoy!";
   }
   
   return recommendations;
-};
-
-/**
- * Process the food image using OpenAI Vision API
- * @param {string} base64Image - Base64 encoded image
- * @returns {Promise<Object>} Nutritional information
- * @private
- */
-const processFoodImage = async (base64Image) => {
-  // Call OpenAI to analyze the image
-  const response = await openai.chat.completions.create({
-    model: "gpt-4o", // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
-    messages: [
-      { role: "system", content: IMAGE_ANALYSIS_PROMPT },
-      {
-        role: "user",
-        content: [
-          {
-            type: "image_url",
-            image_url: {
-              url: `data:image/jpeg;base64,${base64Image}`,
-            },
-          },
-          {
-            type: "text",
-            text: "Analyze this food image and provide detailed nutritional information.",
-          },
-        ],
-      },
-    ],
-    response_format: { type: "json_object" },
-    temperature: 0.7,
-  });
-  
-  // Parse the response
-  const result = JSON.parse(response.choices[0].message.content);
-  
-  // Suggest meal type based on time if not provided
-  if (!result.mealType) {
-    result.mealType = suggestMealTypeByTime();
-  }
-  
-  return result;
-};
-
-/**
- * Suggests a meal type based on the current time
- * @returns {string} Suggested meal type
- * @private
- */
-const suggestMealTypeByTime = () => {
-  const hour = new Date().getHours();
-  
-  if (hour >= 5 && hour < 10) {
-    return 'breakfast';
-  } else if (hour >= 10 && hour < 14) {
-    return 'lunch';
-  } else if (hour >= 14 && hour < 18) {
-    return 'snack';
-  } else if (hour >= 18 && hour < 22) {
-    return 'dinner';
-  } else {
-    return 'snack';
-  }
 };
 
 /**
@@ -476,4 +479,25 @@ const suggestMealTypeByTime = () => {
 const generateId = () => {
   return Math.random().toString(36).substring(2, 15) +
     Math.random().toString(36).substring(2, 15);
+};
+
+/**
+ * Suggests a meal type based on the current time
+ * @returns {string} Suggested meal type
+ * @private
+ */
+const suggestMealTypeByTimeInternal = () => {
+  const hour = new Date().getHours();
+  
+  if (hour >= 5 && hour < 10) {
+    return 'breakfast';
+  } else if (hour >= 10 && hour < 14) {
+    return 'lunch';
+  } else if (hour >= 14 && hour < 17) {
+    return 'snack';
+  } else if (hour >= 17 && hour < 21) {
+    return 'dinner';
+  } else {
+    return 'snack';
+  }
 };

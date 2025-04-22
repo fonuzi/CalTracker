@@ -1,161 +1,187 @@
 import React, { createContext, useState, useEffect } from 'react';
-import { saveUserProfile, getUserProfile } from '../services/StorageService';
+import { getUserProfile, getFoodLogs, getFoodLogsForDateRange } from '../services/StorageService';
+import { calculateBMI, calculateBMR, calculateTDEE, calculateCalorieGoal, calculateMacroGoals } from '../utils/calculators';
 
+// Create the context
 export const UserContext = createContext();
 
+// Provider component
 export const UserProvider = ({ children }) => {
-  // User state
+  // State
   const [userProfile, setUserProfile] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [onboarded, setOnboarded] = useState(false);
+  const [healthMetrics, setHealthMetrics] = useState({
+    bmi: 0,
+    bmr: 0,
+    tdee: 0,
+    calorieGoal: 0,
+    macroGoals: {
+      protein: 0,
+      carbs: 0,
+      fat: 0
+    }
+  });
   
   // Load user profile on mount
   useEffect(() => {
-    const loadUserProfile = async () => {
-      try {
-        const profile = await getUserProfile();
-        
-        if (profile) {
-          setUserProfile(profile);
-          setOnboarded(true);
-        }
-      } catch (error) {
-        console.error('Error loading user profile:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    
     loadUserProfile();
   }, []);
   
-  // Update user profile
-  const updateUserProfile = async (updatedProfile) => {
+  // Load user profile from storage
+  const loadUserProfile = async () => {
     try {
-      // Create a new profile object with the updated data
-      const newProfile = {
-        ...userProfile,
-        ...updatedProfile,
-        updatedAt: new Date().toISOString(),
-      };
+      setLoading(true);
+      const profile = await getUserProfile();
       
-      // Save to storage
-      await saveUserProfile(newProfile);
-      
-      // Update state
-      setUserProfile(newProfile);
-      setOnboarded(true);
-      
-      return newProfile;
+      if (profile) {
+        setUserProfile(profile);
+        calculateHealthMetrics(profile);
+      }
     } catch (error) {
-      console.error('Error updating user profile:', error);
-      throw error;
+      console.error('Error loading user profile:', error);
+    } finally {
+      setLoading(false);
     }
   };
   
-  // Calculate progress towards daily goals
-  const calculateDailyProgress = (foodLogs) => {
-    if (!userProfile || !foodLogs) {
-      return {
-        calories: {
-          consumed: 0,
-          goal: userProfile?.calorieGoal || 2000,
-          percentage: 0,
-        },
-        macros: {
-          protein: {
-            consumed: 0,
-            goal: userProfile?.macroGoals?.protein || 100,
-            percentage: 0,
-          },
-          carbs: {
-            consumed: 0,
-            goal: userProfile?.macroGoals?.carbs || 250,
-            percentage: 0,
-          },
-          fat: {
-            consumed: 0,
-            goal: userProfile?.macroGoals?.fat || 70,
-            percentage: 0,
-          },
-        },
-      };
+  // Calculate health metrics
+  const calculateHealthMetrics = (profile) => {
+    if (!profile || !profile.weight || !profile.height || !profile.age || !profile.gender) {
+      return;
     }
     
-    // Sum up nutrients from food logs
-    const totals = foodLogs.reduce(
-      (total, food) => {
-        return {
-          calories: total.calories + (food.calories || 0),
-          protein: total.protein + (food.protein || 0),
-          carbs: total.carbs + (food.carbs || 0),
-          fat: total.fat + (food.fat || 0),
-        };
-      },
-      { calories: 0, protein: 0, carbs: 0, fat: 0 }
-    );
+    // Calculate BMI
+    const bmi = calculateBMI(profile.weight, profile.height);
     
-    // Get goals from user profile
-    const calorieGoal = userProfile.calorieGoal || 2000;
-    const proteinGoal = userProfile.macroGoals?.protein || 100;
-    const carbsGoal = userProfile.macroGoals?.carbs || 250;
-    const fatGoal = userProfile.macroGoals?.fat || 70;
+    // Calculate BMR
+    const bmr = calculateBMR(profile.weight, profile.height, profile.age, profile.gender);
     
-    // Calculate percentages (capped at 100%)
-    const caloriePercentage = Math.min(
-      100,
-      Math.round((totals.calories / calorieGoal) * 100)
-    );
-    const proteinPercentage = Math.min(
-      100,
-      Math.round((totals.protein / proteinGoal) * 100)
-    );
-    const carbsPercentage = Math.min(
-      100,
-      Math.round((totals.carbs / carbsGoal) * 100)
-    );
-    const fatPercentage = Math.min(
-      100,
-      Math.round((totals.fat / fatGoal) * 100)
-    );
+    // Calculate TDEE
+    const tdee = calculateTDEE(bmr, profile.activityLevel || 'moderate');
     
-    return {
+    // Calculate calorie goal
+    const calorieGoal = calculateCalorieGoal(tdee, profile.fitnessGoal || 'maintain');
+    
+    // Calculate macro goals
+    const macroGoals = calculateMacroGoals(calorieGoal, profile.fitnessGoal || 'maintain', profile.weight);
+    
+    // Update state
+    setHealthMetrics({
+      bmi,
+      bmr,
+      tdee,
+      calorieGoal,
+      macroGoals
+    });
+  };
+  
+  // Update user profile
+  const updateUserProfile = async (profile) => {
+    try {
+      setUserProfile(profile);
+      calculateHealthMetrics(profile);
+    } catch (error) {
+      console.error('Error updating user profile:', error);
+    }
+  };
+  
+  // Calculate daily progress based on food logs for a specific date
+  const calculateDailyProgress = (foodLogs) => {
+    // Default progress
+    const progress = {
       calories: {
-        consumed: Math.round(totals.calories),
-        goal: calorieGoal,
-        percentage: caloriePercentage,
+        consumed: 0,
+        goal: healthMetrics.calorieGoal,
+        percentage: 0
       },
       macros: {
         protein: {
-          consumed: Math.round(totals.protein),
-          goal: proteinGoal,
-          percentage: proteinPercentage,
+          consumed: 0,
+          goal: healthMetrics.macroGoals.protein,
+          percentage: 0
         },
         carbs: {
-          consumed: Math.round(totals.carbs),
-          goal: carbsGoal,
-          percentage: carbsPercentage,
+          consumed: 0,
+          goal: healthMetrics.macroGoals.carbs,
+          percentage: 0
         },
         fat: {
-          consumed: Math.round(totals.fat),
-          goal: fatGoal,
-          percentage: fatPercentage,
-        },
-      },
+          consumed: 0,
+          goal: healthMetrics.macroGoals.fat,
+          percentage: 0
+        }
+      }
     };
+    
+    // Sum up all consumed nutrients
+    foodLogs.forEach(food => {
+      // Add calories
+      progress.calories.consumed += food.calories || 0;
+      
+      // Add macros
+      progress.macros.protein.consumed += food.protein || 0;
+      progress.macros.carbs.consumed += food.carbs || 0;
+      progress.macros.fat.consumed += food.fat || 0;
+    });
+    
+    // Calculate percentages
+    if (progress.calories.goal > 0) {
+      progress.calories.percentage = Math.min(100, Math.round((progress.calories.consumed / progress.calories.goal) * 100));
+    }
+    
+    if (progress.macros.protein.goal > 0) {
+      progress.macros.protein.percentage = Math.min(100, Math.round((progress.macros.protein.consumed / progress.macros.protein.goal) * 100));
+    }
+    
+    if (progress.macros.carbs.goal > 0) {
+      progress.macros.carbs.percentage = Math.min(100, Math.round((progress.macros.carbs.consumed / progress.macros.carbs.goal) * 100));
+    }
+    
+    if (progress.macros.fat.goal > 0) {
+      progress.macros.fat.percentage = Math.min(100, Math.round((progress.macros.fat.consumed / progress.macros.fat.goal) * 100));
+    }
+    
+    return progress;
   };
   
-  return (
-    <UserContext.Provider
-      value={{
-        userProfile,
-        loading,
-        onboarded,
-        updateUserProfile,
-        calculateDailyProgress,
-      }}
-    >
-      {children}
-    </UserContext.Provider>
-  );
+  // Get food logs for today
+  const getTodayFoodLogs = async () => {
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      return await getFoodLogs(today);
+    } catch (error) {
+      console.error('Error getting today food logs:', error);
+      return [];
+    }
+  };
+  
+  // Get food logs for a date range
+  const getFoodLogsByDateRange = async (startDate, endDate) => {
+    try {
+      return await getFoodLogsForDateRange(startDate, endDate);
+    } catch (error) {
+      console.error('Error getting food logs by date range:', error);
+      return {};
+    }
+  };
+  
+  // Check if user is onboarded
+  const isOnboarded = () => {
+    return !!userProfile;
+  };
+  
+  // Provider value
+  const value = {
+    userProfile,
+    loading,
+    healthMetrics,
+    updateUserProfile,
+    calculateDailyProgress,
+    getTodayFoodLogs,
+    getFoodLogsByDateRange,
+    onboarded: isOnboarded(),
+    loadUserProfile,
+  };
+  
+  return <UserContext.Provider value={value}>{children}</UserContext.Provider>;
 };

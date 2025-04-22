@@ -1,8 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Icon } from '../assets/icons';
-import * as Animatable from 'react-native-animatable';
-import { stepsToDistance, calculateCaloriesBurned } from '../utils/calculators';
+import { calculateCaloriesBurned, stepsToDistance } from '../utils/calculators';
 
 /**
  * A component to display the user's step count progress
@@ -10,73 +9,95 @@ import { stepsToDistance, calculateCaloriesBurned } from '../utils/calculators';
  * @param {number} goal - Step count goal
  * @param {Object} theme - Current theme
  */
-const StepCounter = ({ steps = 0, goal = 10000, theme, userWeight, onPress }) => {
-  // Calculate percentage of goal achieved (capped at 100%)
+const StepCounter = ({ steps = 0, goal = 10000, theme, userWeight = 70, onPress }) => {
+  // Calculate percentage of goal reached
   const percentage = Math.min(100, Math.round((steps / goal) * 100));
   
-  // Calculate distance based on steps
+  // Calculate distance in kilometers
   const distance = stepsToDistance(steps);
   
   // Calculate calories burned
   const caloriesBurned = calculateCaloriesBurned(steps, userWeight);
   
   return (
-    <TouchableOpacity
-      style={[styles.container, { backgroundColor: theme.colors.surface }]}
+    <TouchableOpacity 
       onPress={onPress}
+      style={[styles.container, { backgroundColor: theme.colors.surface }]}
       activeOpacity={0.8}
     >
-      <Animatable.View animation="fadeIn" duration={1000} style={styles.content}>
-        <View style={styles.header}>
-          <View style={styles.titleContainer}>
-            <Icon name="activity" size={20} color={theme.colors.primary} style={styles.icon} />
-            <Text style={[styles.title, { color: theme.colors.text }]}>
-              Steps
-            </Text>
-          </View>
-          
-          <Text style={[styles.stepCount, { color: theme.colors.text }]}>
+      <View style={styles.headerContainer}>
+        <View style={styles.titleContainer}>
+          <Icon 
+            name="activity" 
+            size={20} 
+            color={theme.colors.primary} 
+            style={styles.titleIcon}
+          />
+          <Text style={[styles.title, { color: theme.colors.text }]}>Steps</Text>
+        </View>
+        
+        <Icon 
+          name="chevron-right" 
+          size={18} 
+          color={theme.colors.secondaryText} 
+        />
+      </View>
+      
+      <View style={styles.progressContainer}>
+        <View style={styles.stepsContainer}>
+          <Text style={[styles.stepsCount, { color: theme.colors.text }]}>
             {steps.toLocaleString()}
+          </Text>
+          <Text style={[styles.stepsGoal, { color: theme.colors.secondaryText }]}>
+            / {goal.toLocaleString()}
           </Text>
         </View>
         
-        <View style={[styles.progressBar, { backgroundColor: theme.colors.border }]}>
-          <Animatable.View
-            animation="slideInLeft"
-            duration={1000}
+        <View 
+          style={[
+            styles.progressBar, 
+            { backgroundColor: theme.colors.surfaceHighlight }
+          ]}
+        >
+          <View 
             style={[
-              styles.progressFill,
-              {
-                width: `${percentage}%`,
+              styles.progressFill, 
+              { 
                 backgroundColor: theme.colors.primary,
-              },
-            ]}
+                width: `${percentage}%`,
+              }
+            ]} 
           />
         </View>
-        
-        <View style={styles.statsContainer}>
-          <View style={styles.statItem}>
-            <Icon name="target" size={16} color={theme.colors.secondaryText} style={styles.statIcon} />
-            <Text style={[styles.statText, { color: theme.colors.secondaryText }]}>
-              Goal: {goal.toLocaleString()}
-            </Text>
-          </View>
-          
-          <View style={styles.statItem}>
-            <Icon name="map-pin" size={16} color={theme.colors.secondaryText} style={styles.statIcon} />
-            <Text style={[styles.statText, { color: theme.colors.secondaryText }]}>
-              {distance.toFixed(2)} km
-            </Text>
-          </View>
-          
-          <View style={styles.statItem}>
-            <Icon name="zap" size={16} color={theme.colors.secondaryText} style={styles.statIcon} />
-            <Text style={[styles.statText, { color: theme.colors.secondaryText }]}>
-              {caloriesBurned} cal
-            </Text>
-          </View>
+      </View>
+      
+      <View style={styles.statsContainer}>
+        <View style={styles.statItem}>
+          <Icon 
+            name="map-pin" 
+            size={16} 
+            color={theme.colors.secondaryText} 
+            style={styles.statIcon} 
+          />
+          <Text style={[styles.statValue, { color: theme.colors.text }]}>
+            {distance.toFixed(2)} km
+          </Text>
         </View>
-      </Animatable.View>
+        
+        <View style={styles.statDivider} />
+        
+        <View style={styles.statItem}>
+          <Icon 
+            name="zap" 
+            size={16} 
+            color={theme.colors.secondaryText} 
+            style={styles.statIcon} 
+          />
+          <Text style={[styles.statValue, { color: theme.colors.text }]}>
+            {caloriesBurned} kcal
+          </Text>
+        </View>
+      </View>
     </TouchableOpacity>
   );
 };
@@ -84,39 +105,51 @@ const StepCounter = ({ steps = 0, goal = 10000, theme, userWeight, onPress }) =>
 const styles = StyleSheet.create({
   container: {
     borderRadius: 16,
-    marginHorizontal: 16,
-    marginBottom: 16,
-    overflow: 'hidden',
-  },
-  content: {
     padding: 16,
+    margin: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
   },
-  header: {
+  headerContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 12,
   },
   titleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
   },
+  titleIcon: {
+    marginRight: 8,
+  },
   title: {
     fontSize: 18,
-    fontWeight: '600',
-    marginLeft: 8,
-  },
-  icon: {
-    marginRight: 4,
-  },
-  stepCount: {
-    fontSize: 20,
     fontWeight: 'bold',
+  },
+  progressContainer: {
+    marginBottom: 16,
+  },
+  stepsContainer: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    marginBottom: 8,
+  },
+  stepsCount: {
+    fontSize: 26,
+    fontWeight: 'bold',
+  },
+  stepsGoal: {
+    fontSize: 16,
+    marginLeft: 4,
   },
   progressBar: {
     height: 8,
     borderRadius: 4,
-    marginBottom: 16,
+    width: '100%',
     overflow: 'hidden',
   },
   progressFill: {
@@ -125,17 +158,26 @@ const styles = StyleSheet.create({
   },
   statsContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+    marginTop: 8,
   },
   statItem: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingHorizontal: 12,
   },
   statIcon: {
-    marginRight: 4,
+    marginRight: 6,
   },
-  statText: {
-    fontSize: 14,
+  statValue: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  statDivider: {
+    width: 1,
+    height: 20,
+    backgroundColor: '#E0E0E0',
   },
 });
 

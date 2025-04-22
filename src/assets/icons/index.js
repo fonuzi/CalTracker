@@ -16,42 +16,46 @@ export const Icon = ({ name, size = 24, color = '#FFFFFF', style }) => {
  * Icons used throughout the app
  */
 export const ICONS = {
-  // Navigation icons
-  HOME: 'home',
-  FOOD_LOG: 'book',
-  CAMERA: 'camera',
-  ACTIVITY: 'activity',
-  SETTINGS: 'settings',
+  // Meal types
+  breakfast: 'coffee',
+  lunch: 'sun',
+  dinner: 'moon',
+  snack: 'aperture',
   
-  // Food related icons
-  BREAKFAST: 'sunrise',
-  LUNCH: 'sun',
-  DINNER: 'sunset',
-  SNACK: 'coffee',
+  // Nutrients
+  protein: 'check-square',
+  carbs: 'circle',
+  fat: 'triangle',
   
-  // Nutrient icons
-  PROTEIN: 'box',
-  CARBS: 'circle',
-  FAT: 'droplet',
+  // Navigation
+  home: 'home',
+  camera: 'camera',
+  foodLog: 'book',
+  profile: 'user',
+  settings: 'settings',
   
-  // Action icons
-  ADD: 'plus',
-  EDIT: 'edit',
-  DELETE: 'trash-2',
-  SAVE: 'check',
-  CANCEL: 'x',
+  // Actions
+  add: 'plus',
+  edit: 'edit-2',
+  delete: 'trash-2',
+  save: 'check',
+  cancel: 'x',
+  back: 'arrow-left',
   
-  // Other icons
-  PROFILE: 'user',
-  STEPS: 'trending-up',
-  CALORIES: 'zap',
-  WEIGHT: 'anchor',
-  WATER: 'droplet',
-  SLEEP: 'moon',
+  // Status
+  success: 'check-circle',
+  error: 'alert-circle',
+  warning: 'alert-triangle',
+  info: 'info',
   
-  // Theme icons
-  DARK_MODE: 'moon',
-  LIGHT_MODE: 'sun',
+  // Other
+  search: 'search',
+  calendar: 'calendar',
+  activity: 'activity',
+  steps: 'trending-up',
+  water: 'droplet',
+  sleep: 'moon',
+  weight: 'bar-chart-2',
 };
 
 /**
@@ -60,20 +64,14 @@ export const ICONS = {
  * @returns {string} Icon name from ICONS
  */
 export const getMealTypeIcon = (mealType) => {
-  const type = mealType ? mealType.toLowerCase() : '';
+  const mealTypeIcons = {
+    breakfast: 'coffee',
+    lunch: 'sun',
+    dinner: 'moon',
+    snack: 'aperture',
+  };
   
-  switch (type) {
-    case 'breakfast':
-      return ICONS.BREAKFAST;
-    case 'lunch':
-      return ICONS.LUNCH;
-    case 'dinner':
-      return ICONS.DINNER;
-    case 'snack':
-      return ICONS.SNACK;
-    default:
-      return ICONS.FOOD_LOG;
-  }
+  return mealTypeIcons[mealType?.toLowerCase()] || 'help-circle';
 };
 
 /**
@@ -82,20 +80,14 @@ export const getMealTypeIcon = (mealType) => {
  * @returns {string} Color hex code
  */
 export const getMealTypeColor = (mealType) => {
-  const type = mealType ? mealType.toLowerCase() : '';
+  const mealTypeColors = {
+    breakfast: '#5AC8FA', // Blue
+    lunch: '#FFCC00', // Yellow
+    dinner: '#5856D6', // Purple
+    snack: '#FF9500', // Orange
+  };
   
-  switch (type) {
-    case 'breakfast':
-      return '#FF9F43'; // Orange
-    case 'lunch':
-      return '#4ECDC4'; // Teal
-    case 'dinner':
-      return '#8E7CFF'; // Purple
-    case 'snack':
-      return '#FF6B6B'; // Red
-    default:
-      return '#8E7CFF'; // Default Purple
-  }
+  return mealTypeColors[mealType?.toLowerCase()] || '#AAAAAA';
 };
 
 /**
@@ -104,19 +96,17 @@ export const getMealTypeColor = (mealType) => {
  * @returns {string} Icon name from ICONS
  */
 export const getNutrientIcon = (nutrientType) => {
-  const type = nutrientType ? nutrientType.toLowerCase() : '';
+  const nutrientIcons = {
+    protein: 'check-square',
+    carbs: 'circle',
+    fat: 'triangle',
+    fiber: 'hexagon',
+    sugar: 'octagon',
+    sodium: 'hash',
+    water: 'droplet',
+  };
   
-  switch (type) {
-    case 'protein':
-      return ICONS.PROTEIN;
-    case 'carbs':
-    case 'carbohydrates':
-      return ICONS.CARBS;
-    case 'fat':
-      return ICONS.FAT;
-    default:
-      return ICONS.CALORIES;
-  }
+  return nutrientIcons[nutrientType?.toLowerCase()] || 'help-circle';
 };
 
 /**
@@ -125,17 +115,15 @@ export const getNutrientIcon = (nutrientType) => {
  * @returns {string} Color hex code
  */
 export const getNutrientColor = (nutrientType) => {
-  const type = nutrientType ? nutrientType.toLowerCase() : '';
+  const nutrientColors = {
+    protein: '#5856D6', // Purple
+    carbs: '#FF9500', // Orange
+    fat: '#FF3B30', // Red
+    fiber: '#34C759', // Green
+    sugar: '#FF2D55', // Pink
+    sodium: '#5AC8FA', // Blue
+    water: '#007AFF', // Blue
+  };
   
-  switch (type) {
-    case 'protein':
-      return '#FF6B6B'; // Red
-    case 'carbs':
-    case 'carbohydrates':
-      return '#4ECDC4'; // Teal
-    case 'fat':
-      return '#FFD166'; // Yellow
-    default:
-      return '#8E7CFF'; // Default Purple
-  }
+  return nutrientColors[nutrientType?.toLowerCase()] || '#AAAAAA';
 };
