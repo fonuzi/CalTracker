@@ -55,7 +55,16 @@ const CameraScreen = ({ navigation }) => {
   
   // Function to optimize image for API request
   const optimizeImage = async (uri) => {
+    // Check if we're on web platform
+    const isWeb = Platform.OS === 'web';
+    
     try {
+      // In web environments, skip optimization and return original URI
+      if (isWeb) {
+        console.log('Web environment detected, skipping image optimization');
+        return uri;
+      }
+      
       // Get file info to check size
       const fileInfo = await FileSystem.getInfoAsync(uri);
       console.log(`Original image size: ${Math.round(fileInfo.size / 1024)} KB`);
@@ -148,10 +157,15 @@ const CameraScreen = ({ navigation }) => {
     setIsAnalyzing(true);
     
     try {
-      // Check if image URI exists
-      const fileInfo = await FileSystem.getInfoAsync(imageUri);
-      if (!fileInfo.exists) {
-        throw new Error('Image file not found.');
+      // Check if we're on web platform
+      const isWeb = Platform.OS === 'web';
+      
+      if (!isWeb) {
+        // If not web, check if image URI exists
+        const fileInfo = await FileSystem.getInfoAsync(imageUri);
+        if (!fileInfo.exists) {
+          throw new Error('Image file not found.');
+        }
       }
       
       const result = await analyzeFoodImage(imageUri);
