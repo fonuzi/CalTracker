@@ -10,13 +10,8 @@
  * @returns {number} Total calories
  */
 export const calculateCaloriesFromMacros = (protein = 0, carbs = 0, fat = 0) => {
-  // Calculate calories from each macronutrient
-  const proteinCals = protein * 4; // 4 calories per gram of protein
-  const carbsCals = carbs * 4; // 4 calories per gram of carbs
-  const fatCals = fat * 9; // 9 calories per gram of fat
-  
-  // Return the sum
-  return proteinCals + carbsCals + fatCals;
+  // Calories per gram: protein (4), carbs (4), fat (9)
+  return (protein * 4) + (carbs * 4) + (fat * 9);
 };
 
 /**
@@ -27,47 +22,20 @@ export const calculateCaloriesFromMacros = (protein = 0, carbs = 0, fat = 0) => 
  * @returns {Object} Percentages of each macronutrient
  */
 export const calculateMacroPercentages = (protein = 0, carbs = 0, fat = 0) => {
-  // Calculate calories from each macronutrient
   const proteinCals = protein * 4;
-  const carbsCals = carbs * 4;
+  const carbCals = carbs * 4;
   const fatCals = fat * 9;
   
-  // Calculate total calories
-  const totalCals = proteinCals + carbsCals + fatCals;
+  const totalCals = proteinCals + carbCals + fatCals;
   
-  // Avoid division by zero
   if (totalCals === 0) {
     return { protein: 0, carbs: 0, fat: 0 };
   }
   
-  // Calculate percentages
-  const proteinPercentage = Math.round((proteinCals / totalCals) * 100);
-  const carbsPercentage = Math.round((carbsCals / totalCals) * 100);
-  const fatPercentage = Math.round((fatCals / totalCals) * 100);
-  
-  // Ensure percentages add up to 100%
-  let adjustedProteinPercentage = proteinPercentage;
-  let adjustedCarbsPercentage = carbsPercentage;
-  let adjustedFatPercentage = fatPercentage;
-  
-  const totalPercentage = proteinPercentage + carbsPercentage + fatPercentage;
-  if (totalPercentage !== 100) {
-    const difference = 100 - totalPercentage;
-    
-    // Distribute the difference
-    if (proteinPercentage >= carbsPercentage && proteinPercentage >= fatPercentage) {
-      adjustedProteinPercentage += difference;
-    } else if (carbsPercentage >= proteinPercentage && carbsPercentage >= fatPercentage) {
-      adjustedCarbsPercentage += difference;
-    } else {
-      adjustedFatPercentage += difference;
-    }
-  }
-  
   return {
-    protein: adjustedProteinPercentage,
-    carbs: adjustedCarbsPercentage,
-    fat: adjustedFatPercentage,
+    protein: Math.round((proteinCals / totalCals) * 100),
+    carbs: Math.round((carbCals / totalCals) * 100),
+    fat: Math.round((fatCals / totalCals) * 100)
   };
 };
 
@@ -77,43 +45,19 @@ export const calculateMacroPercentages = (protein = 0, carbs = 0, fat = 0) => {
  * @returns {Object} Formatted food data
  */
 export const formatFoodData = (food) => {
-  const result = { ...food };
+  if (!food) return null;
   
-  // Round numerical values
-  if (result.calories) result.calories = Math.round(result.calories);
-  if (result.protein) result.protein = Math.round(result.protein);
-  if (result.carbs) result.carbs = Math.round(result.carbs);
-  if (result.fat) result.fat = Math.round(result.fat);
-  if (result.fiber) result.fiber = Math.round(result.fiber);
-  if (result.sugar) result.sugar = Math.round(result.sugar);
+  // Round numeric values for better display
+  const formatted = { ...food };
   
-  // Calculate macros if not provided but calories are
-  if (result.calories && (!result.protein || !result.carbs || !result.fat)) {
-    // Estimate macros based on calories (this is an approximation)
-    const estimatedProtein = Math.round(result.calories * 0.25 / 4);
-    const estimatedFat = Math.round(result.calories * 0.3 / 9);
-    const estimatedCarbs = Math.round(result.calories * 0.45 / 4);
-    
-    if (!result.protein) result.protein = estimatedProtein;
-    if (!result.carbs) result.carbs = estimatedCarbs;
-    if (!result.fat) result.fat = estimatedFat;
-  }
+  if (formatted.calories) formatted.calories = Math.round(formatted.calories);
+  if (formatted.protein) formatted.protein = Math.round(formatted.protein);
+  if (formatted.carbs) formatted.carbs = Math.round(formatted.carbs);
+  if (formatted.fat) formatted.fat = Math.round(formatted.fat);
+  if (formatted.fiber) formatted.fiber = Math.round(formatted.fiber);
+  if (formatted.sugar) formatted.sugar = Math.round(formatted.sugar);
   
-  // Calculate calories if not provided but macros are
-  if (!result.calories && (result.protein || result.carbs || result.fat)) {
-    result.calories = calculateCaloriesFromMacros(
-      result.protein || 0,
-      result.carbs || 0,
-      result.fat || 0
-    );
-  }
-  
-  // Add meal type if not present
-  if (!result.mealType) {
-    result.mealType = suggestMealTypeByTime();
-  }
-  
-  return result;
+  return formatted;
 };
 
 /**
@@ -138,9 +82,9 @@ export const suggestMealTypeByTime = (date = new Date()) => {
     return 'breakfast';
   } else if (hour >= 10 && hour < 14) {
     return 'lunch';
-  } else if (hour >= 14 && hour < 18) {
+  } else if (hour >= 14 && hour < 17) {
     return 'snack';
-  } else if (hour >= 18 && hour < 22) {
+  } else if (hour >= 17 && hour < 22) {
     return 'dinner';
   } else {
     return 'snack';
@@ -153,21 +97,16 @@ export const suggestMealTypeByTime = (date = new Date()) => {
  * @returns {string} Food classification
  */
 export const classifyFoodByMacros = ({ protein = 0, carbs = 0, fat = 0 }) => {
-  // Calculate total calories from macros
-  const totalCals = calculateCaloriesFromMacros(protein, carbs, fat);
-  
-  // Calculate percentages
   const percentages = calculateMacroPercentages(protein, carbs, fat);
   
-  // Classify based on dominant macronutrient
   if (percentages.protein >= 40) {
-    return 'high-protein';
+    return 'High Protein';
   } else if (percentages.carbs >= 60) {
-    return 'high-carb';
+    return 'High Carb';
   } else if (percentages.fat >= 40) {
-    return 'high-fat';
+    return 'High Fat';
   } else {
-    return 'balanced';
+    return 'Balanced';
   }
 };
 
@@ -177,14 +116,14 @@ export const classifyFoodByMacros = ({ protein = 0, carbs = 0, fat = 0 }) => {
  * @returns {string} Portion size description
  */
 export const estimatePortionSize = (calories) => {
-  if (calories < 150) {
-    return 'small';
-  } else if (calories < 350) {
-    return 'medium';
-  } else if (calories < 600) {
-    return 'large';
+  if (calories < 200) {
+    return 'Small';
+  } else if (calories < 500) {
+    return 'Medium';
+  } else if (calories < 800) {
+    return 'Large';
   } else {
-    return 'extra large';
+    return 'Very Large';
   }
 };
 
@@ -193,7 +132,6 @@ export const estimatePortionSize = (calories) => {
  * @returns {string} Unique ID
  * @private
  */
-const generateId = () => {
-  return Math.random().toString(36).substring(2, 15) +
-    Math.random().toString(36).substring(2, 15);
+const generateUniqueId = () => {
+  return Date.now().toString(36) + Math.random().toString(36).substring(2, 7);
 };

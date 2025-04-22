@@ -21,7 +21,7 @@ export const spacing = {
   lg: 24,
   xl: 32,
   xxl: 48,
-  xxxl: 64,
+  xxxl: 64
 };
 
 /**
@@ -33,7 +33,7 @@ export const borderRadius = {
   md: 12,
   lg: 16,
   xl: 24,
-  circle: 9999,
+  round: 9999 // For circular elements
 };
 
 /**
@@ -44,57 +44,118 @@ export const iconSizes = {
   sm: 20,
   md: 24,
   lg: 32,
-  xl: 48,
+  xl: 48
 };
 
 /**
  * Common layout styles
  */
 export const layouts = {
+  // Flex layouts
   row: {
-    flexDirection: 'row',
+    flexDirection: 'row'
   },
   rowCenter: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'center'
   },
   rowBetween: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'space-between'
+  },
+  rowAround: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around'
+  },
+  column: {
+    flexDirection: 'column'
+  },
+  columnCenter: {
+    flexDirection: 'column',
+    alignItems: 'center'
   },
   center: {
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'center'
   },
+  
+  // Margin helpers
+  marginH: (size) => ({
+    marginHorizontal: typeof size === 'number' ? size : spacing[size || 'md']
+  }),
+  marginV: (size) => ({
+    marginVertical: typeof size === 'number' ? size : spacing[size || 'md']
+  }),
+  marginT: (size) => ({
+    marginTop: typeof size === 'number' ? size : spacing[size || 'md']
+  }),
+  marginB: (size) => ({
+    marginBottom: typeof size === 'number' ? size : spacing[size || 'md']
+  }),
+  marginL: (size) => ({
+    marginLeft: typeof size === 'number' ? size : spacing[size || 'md']
+  }),
+  marginR: (size) => ({
+    marginRight: typeof size === 'number' ? size : spacing[size || 'md']
+  }),
+  
+  // Padding helpers
+  paddingH: (size) => ({
+    paddingHorizontal: typeof size === 'number' ? size : spacing[size || 'md']
+  }),
+  paddingV: (size) => ({
+    paddingVertical: typeof size === 'number' ? size : spacing[size || 'md']
+  }),
+  paddingT: (size) => ({
+    paddingTop: typeof size === 'number' ? size : spacing[size || 'md']
+  }),
+  paddingB: (size) => ({
+    paddingBottom: typeof size === 'number' ? size : spacing[size || 'md']
+  }),
+  paddingL: (size) => ({
+    paddingLeft: typeof size === 'number' ? size : spacing[size || 'md']
+  }),
+  paddingR: (size) => ({
+    paddingRight: typeof size === 'number' ? size : spacing[size || 'md']
+  }),
+  
+  // Fill parent
   fill: {
-    flex: 1,
+    flex: 1
   },
+  fullWidth: {
+    width: '100%'
+  },
+  fullHeight: {
+    height: '100%'
+  }
 };
 
 /**
  * Shadow styles
  */
 export const shadows = {
-  small: {
+  sm: {
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
-    elevation: 2,
+    elevation: 2
   },
-  medium: {
+  md: {
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
+    shadowOpacity: 0.1,
     shadowRadius: 4,
-    elevation: 4,
+    elevation: 3
   },
-  large: {
+  lg: {
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 8,
-  },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 5
+  }
 };

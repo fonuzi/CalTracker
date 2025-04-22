@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { AnimatedCircularProgress } from 'react-native-circular-progress';
+import { CircularProgress } from 'react-native-circular-progress';
 import { Icon } from '../assets/icons';
 
 /**
@@ -10,66 +10,88 @@ import { Icon } from '../assets/icons';
  * @param {Object} theme - Current theme
  */
 const CalorieProgress = ({ consumed = 0, goal = 2000, theme }) => {
-  // Calculate percentage of goal consumed
-  const percentage = goal > 0 ? Math.min(100, Math.round((consumed / goal) * 100)) : 0;
+  // Calculate percentage
+  const percentage = Math.min(100, Math.round((consumed / goal) * 100));
   
   // Calculate remaining calories
   const remaining = Math.max(0, goal - consumed);
   
-  // Determine fill color based on percentage
-  const getFillColor = () => {
-    if (percentage < 80) {
-      return theme.colors.success; // Good progress (green)
-    } else if (percentage < 100) {
-      return theme.colors.warning; // Warning (orange)
+  // Get status color based on percentage
+  const getStatusColor = () => {
+    if (percentage >= 100) {
+      return theme.colors.error;
+    } else if (percentage >= 85) {
+      return theme.colors.warning;
     } else {
-      return theme.colors.error; // Over goal (red)
+      return theme.colors.success;
     }
+  };
+  
+  // Format large numbers with commas
+  const formatNumber = (num) => {
+    return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   };
   
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.surface }]}>
-      <View style={styles.titleContainer}>
-        <Text style={[styles.title, { color: theme.colors.text }]}>Daily Calories</Text>
-        <View style={styles.goalContainer}>
-          <Icon name="target" size={16} color={theme.colors.secondaryText} style={styles.goalIcon} />
-          <Text style={[styles.goalText, { color: theme.colors.secondaryText }]}>
-            Goal: {goal}
-          </Text>
-        </View>
-      </View>
-      
       <View style={styles.progressContainer}>
-        <AnimatedCircularProgress
-          size={140}
+        <CircularProgress
+          size={120}
           width={12}
-          backgroundWidth={8}
           fill={percentage}
-          tintColor={getFillColor()}
+          tintColor={getStatusColor()}
           backgroundColor={theme.colors.surfaceHighlight}
-          arcSweepAngle={240}
-          rotation={-120}
+          rotation={0}
           lineCap="round"
         >
           {() => (
             <View style={styles.progressTextContainer}>
-              <Text style={[styles.consumedText, { color: theme.colors.text }]}>
-                {consumed}
+              <Text style={[styles.calorieCount, { color: theme.colors.text }]}>
+                {formatNumber(consumed)}
               </Text>
-              <Text style={[styles.caloriesLabel, { color: theme.colors.secondaryText }]}>
-                calories
+              <Text style={[styles.calorieLabel, { color: theme.colors.secondaryText }]}>
+                KCAL
               </Text>
             </View>
           )}
-        </AnimatedCircularProgress>
+        </CircularProgress>
+      </View>
+      
+      <View style={styles.detailsContainer}>
+        <Text style={[styles.title, { color: theme.colors.text }]}>
+          Daily Calories
+        </Text>
         
-        <View style={styles.remainingContainer}>
-          <Text style={[styles.remainingText, { color: theme.colors.text }]}>
-            {remaining}
-          </Text>
-          <Text style={[styles.remainingLabel, { color: theme.colors.secondaryText }]}>
-            {remaining === 1 ? 'calorie left' : 'calories left'}
-          </Text>
+        <View style={styles.detailRow}>
+          <View style={styles.detailItem}>
+            <Icon name="target" size={18} color={theme.colors.primary} style={styles.detailIcon} />
+            <Text style={[styles.detailValue, { color: theme.colors.text }]}>
+              {formatNumber(goal)}
+            </Text>
+            <Text style={[styles.detailLabel, { color: theme.colors.secondaryText }]}>
+              Goal
+            </Text>
+          </View>
+          
+          <View style={styles.detailItem}>
+            <Icon name="battery-charging" size={18} color={getStatusColor()} style={styles.detailIcon} />
+            <Text style={[styles.detailValue, { color: theme.colors.text }]}>
+              {formatNumber(remaining)}
+            </Text>
+            <Text style={[styles.detailLabel, { color: theme.colors.secondaryText }]}>
+              Remaining
+            </Text>
+          </View>
+          
+          <View style={styles.detailItem}>
+            <Icon name="percent" size={18} color={theme.colors.secondary} style={styles.detailIcon} />
+            <Text style={[styles.detailValue, { color: theme.colors.text }]}>
+              {percentage}%
+            </Text>
+            <Text style={[styles.detailLabel, { color: theme.colors.secondaryText }]}>
+              Complete
+            </Text>
+          </View>
         </View>
       </View>
     </View>
@@ -79,61 +101,54 @@ const CalorieProgress = ({ consumed = 0, goal = 2000, theme }) => {
 const styles = StyleSheet.create({
   container: {
     borderRadius: 16,
-    padding: 16,
-    margin: 16,
+    padding: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  titleContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  progressContainer: {
+    marginRight: 20,
+  },
+  progressTextContainer: {
     alignItems: 'center',
-    marginBottom: 16,
+  },
+  calorieCount: {
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  calorieLabel: {
+    fontSize: 12,
+    marginTop: 2,
+  },
+  detailsContainer: {
+    flex: 1,
   },
   title: {
     fontSize: 18,
     fontWeight: 'bold',
+    marginBottom: 16,
   },
-  goalContainer: {
+  detailRow: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  detailItem: {
     alignItems: 'center',
   },
-  goalIcon: {
-    marginRight: 4,
+  detailIcon: {
+    marginBottom: 6,
   },
-  goalText: {
-    fontSize: 14,
+  detailValue: {
+    fontSize: 16,
+    fontWeight: '600',
   },
-  progressContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 8,
-  },
-  progressTextContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  consumedText: {
-    fontSize: 30,
-    fontWeight: 'bold',
-  },
-  caloriesLabel: {
-    fontSize: 14,
-    marginTop: 4,
-  },
-  remainingContainer: {
-    alignItems: 'center',
-    marginTop: 16,
-  },
-  remainingText: {
-    fontSize: 22,
-    fontWeight: 'bold',
-  },
-  remainingLabel: {
-    fontSize: 14,
+  detailLabel: {
+    fontSize: 12,
+    marginTop: 2,
   },
 });
 

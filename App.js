@@ -3,8 +3,8 @@ import { View, StatusBar, useColorScheme, Platform } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
-import { getAppSettings, saveAppSettings } from './src/services/StorageService';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { getAppSettings, saveAppSettings, getOnboardingStatus } from './src/services/StorageService';
 import { lightTheme, darkTheme } from './src/theme/colors';
 import { Icon } from './src/assets/icons';
 import { UserProvider } from './src/context/UserContext';
@@ -40,14 +40,13 @@ export default function App() {
         const settings = await getAppSettings();
         
         // Set theme preference from settings if available
-        if (settings && settings.theme) {
-          setIsDarkMode(settings.theme === 'dark');
+        if (settings && settings.darkMode !== undefined) {
+          setIsDarkMode(settings.darkMode);
         }
         
         // Check if onboarding is complete
-        if (settings && settings.onboardingComplete) {
-          setOnboardingComplete(true);
-        }
+        const onboardingStatus = await getOnboardingStatus();
+        setOnboardingComplete(onboardingStatus);
       } catch (error) {
         console.error('Error loading app settings:', error);
       } finally {
@@ -147,7 +146,7 @@ export default function App() {
                     screenOptions={({ route }) => ({
                       headerShown: false,
                       tabBarActiveTintColor: theme.colors.primary,
-                      tabBarInactiveTintColor: theme.colors.tertiaryText,
+                      tabBarInactiveTintColor: theme.colors.secondaryText,
                       tabBarStyle: {
                         backgroundColor: theme.colors.surface,
                         borderTopColor: theme.colors.border,
@@ -161,7 +160,7 @@ export default function App() {
                         if (route.name === 'Home') {
                           iconName = 'home';
                         } else if (route.name === 'Food Log') {
-                          iconName = 'book';
+                          iconName = 'book-open';
                         } else if (route.name === 'Camera') {
                           iconName = 'camera';
                         } else if (route.name === 'Activity') {

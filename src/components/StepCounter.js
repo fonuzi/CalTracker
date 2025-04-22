@@ -1,7 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Icon } from '../assets/icons';
-import { calculateCaloriesBurned, stepsToDistance } from '../utils/calculators';
 
 /**
  * A component to display the user's step count progress
@@ -9,93 +8,84 @@ import { calculateCaloriesBurned, stepsToDistance } from '../utils/calculators';
  * @param {number} goal - Step count goal
  * @param {Object} theme - Current theme
  */
-const StepCounter = ({ steps = 0, goal = 10000, theme, userWeight = 70, onPress }) => {
-  // Calculate percentage of goal reached
+const StepCounter = ({ steps = 0, goal = 10000, theme, onPress }) => {
+  // Calculate percentage
   const percentage = Math.min(100, Math.round((steps / goal) * 100));
   
-  // Calculate distance in kilometers
-  const distance = stepsToDistance(steps);
+  // Calculate kilometers based on steps (rough estimate)
+  const kilometers = (steps * 0.0008).toFixed(2);
   
-  // Calculate calories burned
-  const caloriesBurned = calculateCaloriesBurned(steps, userWeight);
+  // Format large numbers with commas
+  const formatNumber = (num) => {
+    return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  };
   
   return (
     <TouchableOpacity 
-      onPress={onPress}
       style={[styles.container, { backgroundColor: theme.colors.surface }]}
+      onPress={onPress}
       activeOpacity={0.8}
     >
-      <View style={styles.headerContainer}>
+      <View style={styles.headerRow}>
         <View style={styles.titleContainer}>
-          <Icon 
-            name="activity" 
-            size={20} 
-            color={theme.colors.primary} 
-            style={styles.titleIcon}
-          />
-          <Text style={[styles.title, { color: theme.colors.text }]}>Steps</Text>
+          <Icon name="activity" size={20} color={theme.colors.primary} style={styles.titleIcon} />
+          <Text style={[styles.title, { color: theme.colors.text }]}>
+            Today's Steps
+          </Text>
         </View>
         
-        <Icon 
-          name="chevron-right" 
-          size={18} 
-          color={theme.colors.secondaryText} 
-        />
+        <Icon name="chevron-right" size={20} color={theme.colors.secondaryText} />
       </View>
       
-      <View style={styles.progressContainer}>
+      <View style={styles.contentRow}>
         <View style={styles.stepsContainer}>
-          <Text style={[styles.stepsCount, { color: theme.colors.text }]}>
-            {steps.toLocaleString()}
+          <Text style={[styles.stepCount, { color: theme.colors.text }]}>
+            {formatNumber(steps)}
           </Text>
-          <Text style={[styles.stepsGoal, { color: theme.colors.secondaryText }]}>
-            / {goal.toLocaleString()}
-          </Text>
-        </View>
-        
-        <View 
-          style={[
-            styles.progressBar, 
-            { backgroundColor: theme.colors.surfaceHighlight }
-          ]}
-        >
-          <View 
-            style={[
-              styles.progressFill, 
-              { 
-                backgroundColor: theme.colors.primary,
-                width: `${percentage}%`,
-              }
-            ]} 
-          />
-        </View>
-      </View>
-      
-      <View style={styles.statsContainer}>
-        <View style={styles.statItem}>
-          <Icon 
-            name="map-pin" 
-            size={16} 
-            color={theme.colors.secondaryText} 
-            style={styles.statIcon} 
-          />
-          <Text style={[styles.statValue, { color: theme.colors.text }]}>
-            {distance.toFixed(2)} km
+          <Text style={[styles.stepLabel, { color: theme.colors.secondaryText }]}>
+            steps
           </Text>
         </View>
         
-        <View style={styles.statDivider} />
-        
-        <View style={styles.statItem}>
-          <Icon 
-            name="zap" 
-            size={16} 
-            color={theme.colors.secondaryText} 
-            style={styles.statIcon} 
-          />
-          <Text style={[styles.statValue, { color: theme.colors.text }]}>
-            {caloriesBurned} kcal
-          </Text>
+        <View style={styles.progressContainer}>
+          <View style={styles.goalContainer}>
+            <Text style={[styles.progressText, { color: theme.colors.secondaryText }]}>
+              {percentage}% of daily goal
+            </Text>
+            <Text style={[styles.goalText, { color: theme.colors.secondaryText }]}>
+              Goal: {formatNumber(goal)}
+            </Text>
+          </View>
+          
+          <View style={[styles.progressBackground, { backgroundColor: theme.colors.surfaceHighlight }]}>
+            <View 
+              style={[
+                styles.progressFill, 
+                { 
+                  width: `${percentage}%`,
+                  backgroundColor: percentage >= 100 
+                    ? theme.colors.success 
+                    : theme.colors.primary
+                }
+              ]}
+            />
+          </View>
+          
+          <View style={styles.statsContainer}>
+            <View style={styles.statItem}>
+              <Icon name="navigation" size={14} color={theme.colors.secondary} style={styles.statIcon} />
+              <Text style={[styles.statText, { color: theme.colors.secondaryText }]}>
+                {kilometers} km
+              </Text>
+            </View>
+            
+            <View style={styles.statItem}>
+              <Icon name="zap" size={14} color={theme.colors.warning} style={styles.statIcon} />
+              <Text style={[styles.statText, { color: theme.colors.secondaryText }]}>
+                {Math.round(steps * 0.04)} kcal
+              </Text>
+            </View>
+          </View>
         </View>
       </View>
     </TouchableOpacity>
@@ -106,18 +96,17 @@ const styles = StyleSheet.create({
   container: {
     borderRadius: 16,
     padding: 16,
-    margin: 16,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  headerContainer: {
+  headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 16,
   },
   titleContainer: {
     flexDirection: 'row',
@@ -127,29 +116,41 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   title: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
   },
-  progressContainer: {
-    marginBottom: 16,
+  contentRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   stepsContainer: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    marginBottom: 8,
+    marginRight: 20,
   },
-  stepsCount: {
-    fontSize: 26,
+  stepCount: {
+    fontSize: 28,
     fontWeight: 'bold',
   },
-  stepsGoal: {
-    fontSize: 16,
-    marginLeft: 4,
+  stepLabel: {
+    fontSize: 14,
   },
-  progressBar: {
+  progressContainer: {
+    flex: 1,
+  },
+  goalContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  progressText: {
+    fontSize: 12,
+  },
+  goalText: {
+    fontSize: 12,
+  },
+  progressBackground: {
     height: 8,
     borderRadius: 4,
-    width: '100%',
+    marginBottom: 8,
     overflow: 'hidden',
   },
   progressFill: {
@@ -158,26 +159,17 @@ const styles = StyleSheet.create({
   },
   statsContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-    marginTop: 8,
+    justifyContent: 'space-between',
   },
   statItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
   },
   statIcon: {
-    marginRight: 6,
+    marginRight: 4,
   },
-  statValue: {
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  statDivider: {
-    width: 1,
-    height: 20,
-    backgroundColor: '#E0E0E0',
+  statText: {
+    fontSize: 12,
   },
 });
 

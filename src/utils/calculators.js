@@ -9,12 +9,13 @@
  * @returns {number} BMI value
  */
 export const calculateBMI = (weightKg, heightCm) => {
-  // Convert height from cm to meters and square it
-  const heightM = heightCm / 100;
-  const heightSquared = heightM * heightM;
+  if (!weightKg || !heightCm) return 0;
   
-  // Calculate BMI
-  return weightKg / heightSquared;
+  // Convert height to meters
+  const heightM = heightCm / 100;
+  
+  // BMI formula: weight (kg) / height^2 (m)
+  return weightKg / (heightM * heightM);
 };
 
 /**
@@ -24,13 +25,13 @@ export const calculateBMI = (weightKg, heightCm) => {
  */
 export const getBMICategory = (bmi) => {
   if (bmi < 18.5) {
-    return { category: 'Underweight', color: '#5AC8FA' }; // Blue
+    return { category: 'Underweight', color: '#4ECDC4' };
   } else if (bmi >= 18.5 && bmi < 25) {
-    return { category: 'Normal', color: '#34C759' }; // Green
+    return { category: 'Healthy Weight', color: '#4CAF50' };
   } else if (bmi >= 25 && bmi < 30) {
-    return { category: 'Overweight', color: '#FF9500' }; // Orange
+    return { category: 'Overweight', color: '#FFB100' };
   } else {
-    return { category: 'Obese', color: '#FF3B30' }; // Red
+    return { category: 'Obesity', color: '#FF5252' };
   }
 };
 
@@ -43,12 +44,18 @@ export const getBMICategory = (bmi) => {
  * @returns {number} BMR in calories per day
  */
 export const calculateBMR = (weightKg, heightCm, age, gender) => {
+  if (!weightKg || !heightCm || !age) return 0;
+  
   // Mifflin-St Jeor Equation
+  let bmr = 10 * weightKg + 6.25 * heightCm - 5 * age;
+  
   if (gender === 'male') {
-    return 10 * weightKg + 6.25 * heightCm - 5 * age + 5;
-  } else {
-    return 10 * weightKg + 6.25 * heightCm - 5 * age - 161;
+    bmr += 5;
+  } else if (gender === 'female') {
+    bmr -= 161;
   }
+  
+  return Math.round(bmr);
 };
 
 /**
@@ -58,19 +65,19 @@ export const calculateBMR = (weightKg, heightCm, age, gender) => {
  * @returns {number} TDEE in calories per day
  */
 export const calculateTDEE = (bmr, activityLevel) => {
+  if (!bmr) return 0;
+  
   // Activity multipliers
   const multipliers = {
-    sedentary: 1.2, // Little or no exercise
-    light: 1.375, // Light exercise 1-3 days/week
-    moderate: 1.55, // Moderate exercise 3-5 days/week
-    active: 1.725, // Hard exercise 6-7 days/week
-    'very active': 1.9, // Very hard exercise & physical job or 2x training
+    sedentary: 1.2,       // Little or no exercise
+    light: 1.375,          // Light exercise 1-3 days/week
+    moderate: 1.55,        // Moderate exercise 3-5 days/week
+    active: 1.725,         // Active - Hard exercise 6-7 days/week
+    veryActive: 1.9        // Very active - Hard daily exercise & physical job
   };
   
-  // Get the appropriate multiplier or default to moderate
   const multiplier = multipliers[activityLevel] || multipliers.moderate;
   
-  // Calculate TDEE
   return Math.round(bmr * multiplier);
 };
 
@@ -81,15 +88,18 @@ export const calculateTDEE = (bmr, activityLevel) => {
  * @returns {number} Daily calorie goal
  */
 export const calculateCalorieGoal = (tdee, fitnessGoal) => {
-  // Adjust TDEE based on fitness goal
+  if (!tdee) return 0;
+  
+  // Adjust calories based on fitness goal
   switch (fitnessGoal) {
     case 'lose':
-      return Math.round(tdee * 0.8); // 20% deficit for weight loss
-    case 'gain':
-      return Math.round(tdee * 1.1); // 10% surplus for weight gain
+      return Math.round(tdee * 0.8); // 20% deficit
     case 'maintain':
+      return tdee;
+    case 'gain':
+      return Math.round(tdee * 1.1); // 10% surplus
     default:
-      return tdee; // Maintain weight
+      return tdee;
   }
 };
 
@@ -101,61 +111,55 @@ export const calculateCalorieGoal = (tdee, fitnessGoal) => {
  * @returns {Object} Macronutrient goals in grams
  */
 export const calculateMacroGoals = (calorieGoal, fitnessGoal, weightKg) => {
-  // Default macro ratios based on fitness goal
+  if (!calorieGoal || !weightKg) {
+    return { protein: 0, carbs: 0, fat: 0 };
+  }
+  
   let proteinRatio, carbsRatio, fatRatio;
   
+  // Set macronutrient ratios based on fitness goal
   switch (fitnessGoal) {
     case 'lose':
-      // Higher protein, lower carbs for weight loss
-      proteinRatio = 0.35;
-      carbsRatio = 0.4;
-      fatRatio = 0.25;
+      // Higher protein, moderate fat, lower carbs for weight loss
+      proteinRatio = 0.4; // 40% of calories from protein
+      fatRatio = 0.35;    // 35% of calories from fat
+      carbsRatio = 0.25;  // 25% of calories from carbs
       break;
     case 'gain':
-      // Higher carbs, moderate protein for muscle gain
-      proteinRatio = 0.3;
-      carbsRatio = 0.5;
-      fatRatio = 0.2;
+      // Higher carbs, moderate protein, moderate fat for muscle gain
+      proteinRatio = 0.3; // 30% of calories from protein
+      fatRatio = 0.25;    // 25% of calories from fat
+      carbsRatio = 0.45;  // 45% of calories from carbs
       break;
     case 'maintain':
     default:
       // Balanced macros for maintenance
-      proteinRatio = 0.3;
-      carbsRatio = 0.45;
-      fatRatio = 0.25;
+      proteinRatio = 0.3; // 30% of calories from protein
+      fatRatio = 0.3;     // 30% of calories from fat
+      carbsRatio = 0.4;   // 40% of calories from carbs
       break;
   }
   
-  // Calculate protein based on body weight (higher priority)
-  // For muscle gain/preservation, target 1.6-2.2g per kg bodyweight
-  let proteinG;
-  if (fitnessGoal === 'gain') {
-    proteinG = weightKg * 2.2; // 2.2g per kg for muscle gain
-  } else if (fitnessGoal === 'lose') {
-    proteinG = weightKg * 2.0; // 2.0g per kg for weight loss (preserve muscle)
-  } else {
-    proteinG = weightKg * 1.6; // 1.6g per kg for maintenance
-  }
+  // Ensure protein is at least 1.6g per kg of bodyweight
+  const minProtein = weightKg * 1.6;
+  const proteinFromRatio = (calorieGoal * proteinRatio) / 4;
+  const protein = Math.max(minProtein, proteinFromRatio);
   
-  // Calculate calories from protein
-  const proteinCals = proteinG * 4;
+  // Adjust other macros if protein was increased
+  const proteinCalories = protein * 4;
+  const remainingCalories = calorieGoal - proteinCalories;
   
-  // Adjust remaining calories for carbs and fat
-  const remainingCals = calorieGoal - proteinCals;
-  const remainingRatio = carbsRatio + fatRatio;
+  const adjustedRatio = 1 - proteinRatio;
+  const adjustedCarbsRatio = carbsRatio / adjustedRatio;
+  const adjustedFatRatio = fatRatio / adjustedRatio;
   
-  // Recalculate carbs and fat ratios to distribute remaining calories
-  const adjustedCarbsRatio = carbsRatio / remainingRatio;
-  const adjustedFatRatio = fatRatio / remainingRatio;
-  
-  // Calculate grams of carbs and fat
-  const carbsG = Math.round((remainingCals * adjustedCarbsRatio) / 4);
-  const fatG = Math.round((remainingCals * adjustedFatRatio) / 9);
+  const carbs = (remainingCalories * adjustedCarbsRatio) / 4;
+  const fat = (remainingCalories * adjustedFatRatio) / 9;
   
   return {
-    protein: Math.round(proteinG),
-    carbs: carbsG,
-    fat: fatG,
+    protein: Math.round(protein),
+    carbs: Math.round(carbs),
+    fat: Math.round(fat)
   };
 };
 
@@ -166,10 +170,12 @@ export const calculateMacroGoals = (calorieGoal, fitnessGoal, weightKg) => {
  * @returns {number} Calories burned
  */
 export const calculateCaloriesBurned = (steps, weightKg = 70) => {
-  // Average calorie burn is approximately 0.04 calories per step per kg of body weight
-  // Simplified model: calories = steps * weight * 0.0004
+  if (!steps) return 0;
   
-  return Math.round(steps * weightKg * 0.0004);
+  // Average calories burned per step (weight-dependent)
+  const caloriesPerStep = 0.04 * (weightKg / 70);
+  
+  return Math.round(steps * caloriesPerStep);
 };
 
 /**
@@ -179,14 +185,14 @@ export const calculateCaloriesBurned = (steps, weightKg = 70) => {
  * @returns {number} Distance in kilometers
  */
 export const stepsToDistance = (steps, heightCm = 170) => {
-  // Calculate stride length based on height (approximately 0.415 * height)
-  const strideLength = heightCm * 0.415 / 100; // in meters
+  if (!steps) return 0;
+  
+  // Calculate stride length based on height (average is ~0.43 times height)
+  const strideLength = heightCm * 0.43 / 100; // in meters
   
   // Calculate distance
-  const distanceM = steps * strideLength;
-  
-  // Convert to kilometers
-  return distanceM / 1000;
+  const distanceMeters = steps * strideLength;
+  return distanceMeters / 1000; // convert to kilometers
 };
 
 /**
@@ -196,13 +202,13 @@ export const stepsToDistance = (steps, heightCm = 170) => {
  * @returns {number} Recommended water intake in liters
  */
 export const calculateWaterIntake = (weightKg, activityLevel = 1) => {
-  // Base recommendation: 0.03L per kg of body weight
-  let waterIntake = weightKg * 0.03;
+  if (!weightKg) return 0;
   
-  // Adjust for activity level
-  const activityMultiplier = 1 + (activityLevel - 1) * 0.15;
-  waterIntake *= activityMultiplier;
+  // Base recommendation: ~30ml per kg of body weight
+  const baseWater = weightKg * 0.03;
   
-  // Round to 1 decimal place
-  return Math.round(waterIntake * 10) / 10;
+  // Adjust for activity level (add 0.5-1L for active individuals)
+  const activityAdjustment = Math.max(0, (activityLevel - 1) * 0.25);
+  
+  return baseWater + activityAdjustment;
 };
