@@ -1,101 +1,99 @@
 import React, { createContext, useState, useEffect } from 'react';
-import { saveUserProfile, getUserProfile } from '../services/StorageService';
+import { getUserProfile, saveUserProfile } from '../services/StorageService';
+import { calculateRemainingCalories } from '../utils/foodAnalysis';
 
-// Create context
+// Create the context
 export const UserContext = createContext();
 
+// Provider component
 export const UserProvider = ({ children }) => {
+  // State
   const [userProfile, setUserProfile] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
-
+  
   // Load user profile on mount
   useEffect(() => {
     const loadUserProfile = async () => {
       try {
         const profile = await getUserProfile();
         setUserProfile(profile);
-        setIsLoading(false);
       } catch (error) {
         console.error('Error loading user profile:', error);
+      } finally {
         setIsLoading(false);
       }
     };
-
+    
     loadUserProfile();
   }, []);
-
-  // Update user profile
-  const updateUserProfile = async (newProfile) => {
+  
+  // Function to update the user profile
+  const updateUserProfile = async (profile) => {
     try {
-      const updatedProfile = {
-        ...(userProfile || {}),
-        ...newProfile
-      };
-      
-      await saveUserProfile(updatedProfile);
-      setUserProfile(updatedProfile);
-      return updatedProfile;
+      await saveUserProfile(profile);
+      setUserProfile(profile);
+      return true;
     } catch (error) {
       console.error('Error updating user profile:', error);
-      throw error;
+      return false;
     }
   };
-
-  // Update specific user profile field
-  const updateProfileField = async (field, value) => {
-    try {
-      const updatedProfile = {
-        ...(userProfile || {}),
-        [field]: value
-      };
-      
-      await saveUserProfile(updatedProfile);
-      setUserProfile(updatedProfile);
-      return updatedProfile;
-    } catch (error) {
-      console.error(`Error updating profile field ${field}:`, error);
-      throw error;
-    }
-  };
-
-  // Reset user profile (for logout)
+  
+  // Function to reset the user profile (for logout)
   const resetUserProfile = async () => {
     try {
       await saveUserProfile(null);
       setUserProfile(null);
+      return true;
     } catch (error) {
       console.error('Error resetting user profile:', error);
-      throw error;
+      return false;
     }
   };
-
-  // Calculate daily progress
-  const calculateDailyProgress = (foodLogs = []) => {
-    if (!userProfile || !userProfile.calorieGoal) {
-      return { caloriesConsumed: 0, caloriesRemaining: 0, percentage: 0 };
+  
+  // Function to calculate daily progress
+  const calculateDailyProgress = (foodLogs) => {
+    if (!userProfile) {
+      return {
+        caloriesConsumed: 0,
+        caloriesRemaining: 0,
+        percentage: 0
+      };
     }
-
-    const caloriesConsumed = foodLogs.reduce((total, food) => total + (food.calories || 0), 0);
-    const caloriesRemaining = Math.max(0, userProfile.calorieGoal - caloriesConsumed);
-    const percentage = Math.min(100, Math.round((caloriesConsumed / userProfile.calorieGoal) * 100));
-
+    
+    // Calculate total calories consumed
+    const caloriesConsumed = foodLogs.reduce((total, food) => {
+      return total + (food.calories || 0);
+    }, 0);
+    
+    // Calculate calories remaining
+    const caloriesRemaining = calculateRemainingCalories(
+      userProfile.calorieGoal || 2000,
+      caloriesConsumed
+    );
+    
+    // Calculate percentage of goal
+    const percentage = Math.min(
+      100,
+      Math.round((caloriesConsumed / (userProfile.calorieGoal || 2000)) * 100)
+    );
+    
     return {
       caloriesConsumed,
       caloriesRemaining,
       percentage
     };
   };
-
-  // Context value
+  
+  // Value object to be provided to consumers
   const value = {
     userProfile,
     isLoading,
     updateUserProfile,
-    updateProfileField,
     resetUserProfile,
     calculateDailyProgress
   };
-
+  
   return (
     <UserContext.Provider value={value}>
       {children}

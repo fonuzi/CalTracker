@@ -16,39 +16,45 @@ export const Icon = ({ name, size = 24, color = '#FFFFFF' }) => {
  * Icons used throughout the app
  */
 export const ICONS = {
+  // Navigation
   HOME: 'home',
-  FOOD_LOG: 'book',
   CAMERA: 'camera',
-  ACTIVITY: 'activity',
+  FOOD_LOG: 'book',
+  STEPS: 'activity',
   SETTINGS: 'settings',
   PROFILE: 'user',
+  
+  // Actions
   ADD: 'plus',
-  REMOVE: 'minus',
   EDIT: 'edit',
   DELETE: 'trash-2',
+  BACK: 'arrow-left',
+  CLOSE: 'x',
   SEARCH: 'search',
-  CALENDAR: 'calendar',
+  SAVE: 'save',
+  REFRESH: 'refresh-cw',
+  
+  // Meal types
+  BREAKFAST: 'sunrise',
+  LUNCH: 'sun',
+  DINNER: 'moon',
+  SNACK: 'coffee',
+  OTHER: 'package',
+  
+  // Nutrients
+  PROTEIN: 'battery-charging',
+  CARBS: 'pie-chart',
+  FAT: 'droplet',
+  CALORIES: 'zap',
+  
+  // Misc
+  DARK_MODE: 'moon',
+  LIGHT_MODE: 'sun',
+  NOTIFICATION: 'bell',
   INFO: 'info',
   WARNING: 'alert-triangle',
   SUCCESS: 'check-circle',
-  ERROR: 'x-circle',
-  BACK: 'arrow-left',
-  FORWARD: 'arrow-right',
-  MENU: 'menu',
-  CLOSE: 'x',
-  BREAKFAST: 'coffee',
-  LUNCH: 'sun',
-  DINNER: 'moon',
-  SNACK: 'apple',
-  PROTEIN: 'egg',
-  CARBS: 'bread',
-  FAT: 'oil',
-  WEIGHT: 'anchor',
-  HEIGHT: 'chevrons-up',
-  WATER: 'droplet',
-  STEPS: 'activity',
-  SLEEP: 'moon',
-  LOGOUT: 'log-out'
+  ERROR: 'alert-circle',
 };
 
 /**
@@ -57,17 +63,20 @@ export const ICONS = {
  * @returns {string} Icon name from ICONS
  */
 export const getMealTypeIcon = (mealType) => {
-  if (!mealType) return ICONS.FOOD_LOG;
+  const type = mealType ? mealType.toLowerCase() : '';
   
-  const type = mealType.toLowerCase();
-  
-  if (type.includes('breakfast')) return ICONS.BREAKFAST;
-  if (type.includes('lunch')) return ICONS.LUNCH;
-  if (type.includes('dinner')) return ICONS.DINNER;
-  if (type.includes('snack')) return ICONS.SNACK;
-  
-  // Default fallback
-  return ICONS.FOOD_LOG;
+  switch (type) {
+    case 'breakfast':
+      return ICONS.BREAKFAST;
+    case 'lunch':
+      return ICONS.LUNCH;
+    case 'dinner':
+      return ICONS.DINNER;
+    case 'snack':
+      return ICONS.SNACK;
+    default:
+      return ICONS.OTHER;
+  }
 };
 
 /**
@@ -76,17 +85,20 @@ export const getMealTypeIcon = (mealType) => {
  * @returns {string} Color hex code
  */
 export const getMealTypeColor = (mealType) => {
-  if (!mealType) return '#6C63FF'; // Default primary color
+  const type = mealType ? mealType.toLowerCase() : '';
   
-  const type = mealType.toLowerCase();
-  
-  if (type.includes('breakfast')) return '#5E60CE'; // Purple
-  if (type.includes('lunch')) return '#64DFDF'; // Teal
-  if (type.includes('dinner')) return '#6C63FF'; // Primary purple
-  if (type.includes('snack')) return '#FCBF49'; // Yellow/orange
-  
-  // Default fallback
-  return '#6C63FF'; // Primary color
+  switch (type) {
+    case 'breakfast':
+      return '#F59E0B'; // Yellow/Orange
+    case 'lunch':
+      return '#3B82F6'; // Blue
+    case 'dinner':
+      return '#8B5CF6'; // Purple
+    case 'snack':
+      return '#10B981'; // Green
+    default:
+      return '#6B7280'; // Gray
+  }
 };
 
 /**
@@ -95,16 +107,20 @@ export const getMealTypeColor = (mealType) => {
  * @returns {string} Icon name from ICONS
  */
 export const getNutrientIcon = (nutrientType) => {
-  if (!nutrientType) return ICONS.FOOD_LOG;
+  const type = nutrientType ? nutrientType.toLowerCase() : '';
   
-  const type = nutrientType.toLowerCase();
-  
-  if (type.includes('protein')) return ICONS.PROTEIN;
-  if (type.includes('carb')) return ICONS.CARBS;
-  if (type.includes('fat')) return ICONS.FAT;
-  
-  // Default fallback
-  return ICONS.FOOD_LOG;
+  switch (type) {
+    case 'protein':
+      return ICONS.PROTEIN;
+    case 'carbs':
+      return ICONS.CARBS;
+    case 'fat':
+      return ICONS.FAT;
+    case 'calories':
+      return ICONS.CALORIES;
+    default:
+      return 'circle';
+  }
 };
 
 /**
@@ -113,14 +129,18 @@ export const getNutrientIcon = (nutrientType) => {
  * @returns {string} Color hex code
  */
 export const getNutrientColor = (nutrientType) => {
-  if (!nutrientType) return '#6C63FF'; // Default primary color
+  const type = nutrientType ? nutrientType.toLowerCase() : '';
   
-  const type = nutrientType.toLowerCase();
-  
-  if (type.includes('protein')) return '#5E60CE'; // Purple
-  if (type.includes('carb')) return '#64DFDF'; // Teal
-  if (type.includes('fat')) return '#FCBF49'; // Yellow/orange
-  
-  // Default fallback
-  return '#6C63FF'; // Primary color
+  switch (type) {
+    case 'protein':
+      return '#EC4899'; // Pink
+    case 'carbs':
+      return '#3B82F6'; // Blue
+    case 'fat':
+      return '#F59E0B'; // Yellow/Orange
+    case 'calories':
+      return '#8B5CF6'; // Purple
+    default:
+      return '#6B7280'; // Gray
+  }
 };

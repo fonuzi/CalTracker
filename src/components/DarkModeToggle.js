@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, TouchableOpacity } from 'react-native';
-import { Text, Surface, useTheme } from 'react-native-paper';
+import { Text, useTheme, Surface } from 'react-native-paper';
 import { Feather } from '@expo/vector-icons';
 
 /**
@@ -14,39 +14,30 @@ const DarkModeToggle = ({ isDarkMode, onToggle }) => {
   return (
     <Surface style={[styles.container, { backgroundColor: theme.colors.surface }]}>
       <View style={styles.content}>
-        <View style={styles.textContainer}>
-          <Text style={[styles.title, { color: theme.colors.text }]}>
-            Dark Mode
-          </Text>
-          <Text style={[styles.subtitle, { color: theme.colors.secondaryText }]}>
-            {isDarkMode ? 'On' : 'Off'}
-          </Text>
-        </View>
+        <Text style={[styles.label, { color: theme.colors.text }]}>
+          Dark Mode
+        </Text>
         
         <TouchableOpacity 
           style={[
-            styles.toggleButton, 
-            { 
-              backgroundColor: isDarkMode 
-                ? theme.colors.primary 
-                : theme.colors.disabled 
-            }
+            styles.toggle, 
+            isDarkMode ? styles.toggleActive : styles.toggleInactive,
+            { backgroundColor: isDarkMode ? theme.colors.primary + '30' : '#E5E7EB' }
           ]}
           onPress={onToggle}
-          activeOpacity={0.7}
+          activeOpacity={0.8}
         >
           <View 
             style={[
               styles.toggleCircle, 
-              { 
-                transform: [{ translateX: isDarkMode ? 22 : 0 }] 
-              }
+              isDarkMode ? styles.toggleCircleRight : styles.toggleCircleLeft,
+              { backgroundColor: isDarkMode ? theme.colors.primary : '#9CA3AF' }
             ]}
           >
             <Feather 
               name={isDarkMode ? 'moon' : 'sun'} 
-              size={16} 
-              color={isDarkMode ? '#5E60CE' : '#FCBF49'} 
+              size={12} 
+              color="white" 
             />
           </View>
         </TouchableOpacity>
@@ -58,41 +49,39 @@ const DarkModeToggle = ({ isDarkMode, onToggle }) => {
 const styles = StyleSheet.create({
   container: {
     borderRadius: 12,
-    overflow: 'hidden',
-    elevation: 2,
+    padding: 16,
     marginVertical: 8,
+    elevation: 2,
   },
   content: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
+    justifyContent: 'space-between',
   },
-  textContainer: {
-    flex: 1,
-  },
-  title: {
+  label: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '500',
   },
-  subtitle: {
-    fontSize: 14,
-    marginTop: 2,
-  },
-  toggleButton: {
-    width: 50,
+  toggle: {
+    width: 52,
     height: 28,
     borderRadius: 14,
-    justifyContent: 'center',
     padding: 2,
   },
+  toggleActive: {},
+  toggleInactive: {},
   toggleCircle: {
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: 'white',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  toggleCircleLeft: {
+    alignSelf: 'flex-start',
+  },
+  toggleCircleRight: {
+    alignSelf: 'flex-end',
   },
 });
 

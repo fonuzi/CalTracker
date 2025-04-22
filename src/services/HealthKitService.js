@@ -1,5 +1,4 @@
 import { Pedometer } from 'expo-sensors';
-import { Platform } from 'react-native';
 
 /**
  * Checks if the device has permissions to access pedometer data
@@ -7,15 +6,10 @@ import { Platform } from 'react-native';
  */
 export const checkHealthKitPermissions = async () => {
   try {
-    if (Platform.OS !== 'ios' && Platform.OS !== 'android') {
-      console.log('Pedometer not available on this platform');
-      return false;
-    }
-    
-    const isAvailable = await Pedometer.isAvailableAsync();
-    return isAvailable;
+    const result = await Pedometer.isAvailableAsync();
+    return result;
   } catch (error) {
-    console.error('Error checking health permissions:', error);
+    console.error('Error checking pedometer availability:', error);
     return false;
   }
 };
@@ -26,22 +20,10 @@ export const checkHealthKitPermissions = async () => {
  */
 export const requestHealthKitPermissions = async () => {
   try {
-    if (Platform.OS !== 'ios' && Platform.OS !== 'android') {
-      console.log('Pedometer not available on this platform');
-      return false;
-    }
-    
-    const isAvailable = await Pedometer.isAvailableAsync();
-    
-    if (!isAvailable) {
-      console.log('Pedometer is not available on this device');
-      return false;
-    }
-    
-    // iOS doesn't need explicit permission for pedometer
-    return true;
+    const result = await Pedometer.requestPermissionsAsync();
+    return result;
   } catch (error) {
-    console.error('Error requesting health permissions:', error);
+    console.error('Error requesting pedometer permissions:', error);
     return false;
   }
 };
@@ -52,23 +34,20 @@ export const requestHealthKitPermissions = async () => {
  */
 export const getStepsForToday = async () => {
   try {
-    if (Platform.OS !== 'ios' && Platform.OS !== 'android') {
-      console.log('Pedometer not available on this platform');
-      return 0;
-    }
-    
-    const isAvailable = await Pedometer.isAvailableAsync();
-    
+    // Check if pedometer is available
+    const isAvailable = await checkHealthKitPermissions();
     if (!isAvailable) {
-      console.log('Pedometer is not available on this device');
+      console.warn('Pedometer is not available on this device');
       return 0;
     }
     
-    const end = new Date();
+    // Set up start and end dates
+    const now = new Date();
     const start = new Date();
-    start.setHours(0, 0, 0, 0);
+    start.setHours(0, 0, 0, 0); // Start of the day
     
-    const { steps } = await Pedometer.getStepCountAsync(start, end);
+    // Get step count
+    const { steps } = await Pedometer.getStepCountAsync(start, now);
     return steps;
   } catch (error) {
     console.error('Error getting steps for today:', error);
@@ -82,48 +61,41 @@ export const getStepsForToday = async () => {
  */
 export const getStepsForPastWeek = async () => {
   try {
-    if (Platform.OS !== 'ios' && Platform.OS !== 'android') {
-      console.log('Pedometer not available on this platform');
-      return Array(7).fill(0);
-    }
-    
-    const isAvailable = await Pedometer.isAvailableAsync();
-    
+    // Check if pedometer is available
+    const isAvailable = await checkHealthKitPermissions();
     if (!isAvailable) {
-      console.log('Pedometer is not available on this device');
-      return Array(7).fill(0);
+      console.warn('Pedometer is not available on this device');
+      return Array(7).fill(0); // Return array of zeros
     }
     
-    const end = new Date();
-    const result = [];
+    const results = [];
+    const now = new Date();
     
-    // Get data for the past 7 days
-    for (let i = 0; i < 7; i++) {
-      const dayEnd = new Date(end);
-      dayEnd.setDate(end.getDate() - i);
-      dayEnd.setHours(23, 59, 59, 999);
-      
-      const dayStart = new Date(dayEnd);
+    // Loop through the past 7 days
+    for (let i = 6; i >= 0; i--) {
+      const dayStart = new Date();
+      dayStart.setDate(now.getDate() - i);
       dayStart.setHours(0, 0, 0, 0);
       
+      const dayEnd = new Date(dayStart);
+      dayEnd.setHours(23, 59, 59, 999);
+      
+      // If the day is today, use current time as end time
+      const endTime = i === 0 ? now : dayEnd;
+      
       try {
-        const { steps } = await Pedometer.getStepCountAsync(dayStart, dayEnd);
-        result.unshift({
-          date: dayStart.toISOString().split('T')[0],
-          steps,
-        });
+        const { steps } = await Pedometer.getStepCountAsync(dayStart, endTime);
+        results.push(steps);
       } catch (err) {
-        result.unshift({
-          date: dayStart.toISOString().split('T')[0],
-          steps: 0,
-        });
+        console.warn(`Error getting steps for day ${i}:`, err);
+        results.push(0);
       }
     }
     
-    return result;
+    return results;
   } catch (error) {
     console.error('Error getting steps for past week:', error);
-    return Array(7).fill(0);
+    return Array(7).fill(0); // Return array of zeros
   }
 };
 
@@ -134,11 +106,15 @@ export const getStepsForPastWeek = async () => {
  */
 export const subscribeToStepUpdates = (callback) => {
   try {
-    if (Platform.OS !== 'ios' && Platform.OS !== 'android') {
-      console.log('Pedometer not available on this platform');
-      return { remove: () => {} };
-    }
+    // Check permissions before subscribing
+    checkHealthKitPermissions().then(isAvailable => {
+      if (!isAvailable) {
+        console.warn('Pedometer is not available on this device');
+        return null;
+      }
+    });
     
+    // Subscribe to pedometer updates
     const subscription = Pedometer.watchStepCount(result => {
       callback(result.steps);
     });
@@ -146,6 +122,8 @@ export const subscribeToStepUpdates = (callback) => {
     return subscription;
   } catch (error) {
     console.error('Error subscribing to step updates:', error);
-    return { remove: () => {} };
+    return {
+      remove: () => {}, // Return dummy object with remove method
+    };
   }
 };

@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
-import { Text, Surface, useTheme } from 'react-native-paper';
+import { Text, Surface, useTheme, ProgressBar } from 'react-native-paper';
 import { Feather } from '@expo/vector-icons';
 
 /**
@@ -16,49 +16,48 @@ const NutritionCard = ({
   title, 
   amount = 0, 
   unit = 'g', 
-  icon, 
-  color = '#6C63FF', 
+  icon = 'circle', 
+  color = '#8B5CF6',
   goal = 0
 }) => {
   const theme = useTheme();
   
-  // Calculate percentage towards goal
-  const percentage = goal > 0 ? Math.min(100, Math.round((amount / goal) * 100)) : 0;
+  // Calculate percentage of goal
+  const percentage = goal > 0 ? Math.min(1, amount / goal) : 0;
   
   return (
-    <Surface style={[styles.card, { backgroundColor: theme.colors.surface }]}>
+    <Surface style={[styles.container, { backgroundColor: theme.colors.surface }]}>
       <View style={styles.header}>
-        <View style={[styles.iconContainer, { backgroundColor: `${color}20` }]}>
-          <Feather name={icon} size={18} color={color} />
+        <View style={styles.titleContainer}>
+          <Feather name={icon} size={16} color={color} style={styles.icon} />
+          <Text style={[styles.title, { color: theme.colors.text }]}>
+            {title}
+          </Text>
         </View>
-        <Text style={[styles.title, { color: theme.colors.text }]}>
-          {title}
+        
+        <Text style={[styles.percentage, { color }]}>
+          {goal > 0 ? `${Math.round(percentage * 100)}%` : '--'}
         </Text>
       </View>
       
-      <Text style={[styles.amount, { color: theme.colors.text }]}>
-        {amount}{unit}
-      </Text>
+      <View style={styles.amountContainer}>
+        <Text style={[styles.amount, { color: theme.colors.text }]}>
+          {amount}
+        </Text>
+        <Text style={[styles.unit, { color: theme.colors.secondaryText }]}>
+          {unit}
+        </Text>
+      </View>
       
       <View style={styles.progressContainer}>
-        <View 
-          style={[
-            styles.progressBar, 
-            { backgroundColor: `${color}30` }
-          ]}
-        >
-          <View 
-            style={[
-              styles.progressFill, 
-              { 
-                backgroundColor: color,
-                width: `${percentage}%` 
-              }
-            ]} 
-          />
-        </View>
-        <Text style={[styles.goalText, { color: theme.colors.secondaryText }]}>
-          {goal > 0 ? `${percentage}% of ${goal}${unit}` : 'No goal set'}
+        <ProgressBar 
+          progress={percentage} 
+          color={color} 
+          style={styles.progressBar} 
+        />
+        
+        <Text style={[styles.goal, { color: theme.colors.secondaryText }]}>
+          {goal > 0 ? `Goal: ${goal}${unit}` : 'No goal set'}
         </Text>
       </View>
     </Surface>
@@ -66,49 +65,58 @@ const NutritionCard = ({
 };
 
 const styles = StyleSheet.create({
-  card: {
+  container: {
     flex: 1,
     borderRadius: 12,
     padding: 12,
-    margin: 4,
+    marginHorizontal: 4,
     elevation: 2,
   },
   header: {
     flexDirection: 'row',
+    justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 8,
   },
-  iconContainer: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    justifyContent: 'center',
+  titleContainer: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginRight: 8,
+  },
+  icon: {
+    marginRight: 4,
   },
   title: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: 'bold',
+  },
+  percentage: {
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  amountContainer: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    marginBottom: 8,
   },
   amount: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: 'bold',
-    marginVertical: 4,
+    marginRight: 2,
+  },
+  unit: {
+    fontSize: 14,
   },
   progressContainer: {
-    marginTop: 6,
+    marginBottom: 4,
   },
   progressBar: {
     height: 6,
     borderRadius: 3,
-    marginBottom: 4,
+    marginBottom: 6,
   },
-  progressFill: {
-    height: '100%',
-    borderRadius: 3,
-  },
-  goalText: {
-    fontSize: 10,
+  goal: {
+    fontSize: 12,
+    textAlign: 'right',
   },
 });
 

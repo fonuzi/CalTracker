@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, StyleSheet, ScrollView } from 'react-native';
-import { Text, Button, Surface, Chip, useTheme } from 'react-native-paper';
+import { Text, Surface, Button, Chip, useTheme, Divider } from 'react-native-paper';
 import { Feather } from '@expo/vector-icons';
 
 /**
@@ -15,312 +15,319 @@ const FoodAnalysisResult = ({ foodData, onSave, onAdjust, onCancel }) => {
   
   if (!foodData) return null;
   
-  // Format nutrition data
-  const formatNutritionValue = (value, unit = 'g') => {
-    if (value === undefined || value === null) return '-';
-    return `${value}${unit}`;
+  // Format the ingredients list for display
+  const formatIngredients = (ingredients) => {
+    if (!ingredients || !Array.isArray(ingredients)) return 'No ingredients data';
+    
+    return ingredients.join(', ');
   };
   
   return (
-    <Surface style={[styles.container, { backgroundColor: theme.colors.surface }]}>
-      <ScrollView style={styles.scrollView}>
+    <ScrollView 
+      style={styles.scrollView}
+      contentContainerStyle={styles.scrollContent}
+    >
+      <Surface style={[styles.container, { backgroundColor: theme.colors.surface }]}>
         <View style={styles.header}>
           <Text style={[styles.title, { color: theme.colors.text }]}>
             {foodData.name || 'Food Analysis'}
           </Text>
           
-          <Text style={[styles.calories, { color: theme.colors.primary }]}>
-            {foodData.calories || 0} calories
+          <Chip 
+            mode="outlined" 
+            style={[styles.methodChip, { borderColor: theme.colors.primary }]}
+            textStyle={{ color: theme.colors.primary }}
+          >
+            {foodData.method === 'image' ? 'AI Image Analysis' : 'AI Text Analysis'}
+          </Chip>
+        </View>
+        
+        <View style={styles.calorieContainer}>
+          <Text style={[styles.calorieValue, { color: theme.colors.text }]}>
+            {foodData.calories || 0}
+          </Text>
+          <Text style={[styles.calorieLabel, { color: theme.colors.secondaryText }]}>
+            calories
           </Text>
         </View>
         
-        <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-          Macronutrients
-        </Text>
-        
         <View style={styles.macrosContainer}>
-          <View style={[styles.macroItem, { borderColor: theme.colors.protein }]}>
+          <View style={styles.macroItem}>
             <Text style={[styles.macroValue, { color: theme.colors.protein }]}>
-              {formatNutritionValue(foodData.protein)}
+              {foodData.protein || 0}g
             </Text>
-            <Text style={[styles.macroLabel, { color: theme.colors.text }]}>
+            <Text style={[styles.macroLabel, { color: theme.colors.secondaryText }]}>
               Protein
             </Text>
           </View>
           
-          <View style={[styles.macroItem, { borderColor: theme.colors.carbs }]}>
+          <View style={styles.macroItem}>
             <Text style={[styles.macroValue, { color: theme.colors.carbs }]}>
-              {formatNutritionValue(foodData.carbs)}
+              {foodData.carbs || 0}g
             </Text>
-            <Text style={[styles.macroLabel, { color: theme.colors.text }]}>
+            <Text style={[styles.macroLabel, { color: theme.colors.secondaryText }]}>
               Carbs
             </Text>
           </View>
           
-          <View style={[styles.macroItem, { borderColor: theme.colors.fat }]}>
+          <View style={styles.macroItem}>
             <Text style={[styles.macroValue, { color: theme.colors.fat }]}>
-              {formatNutritionValue(foodData.fat)}
+              {foodData.fat || 0}g
             </Text>
-            <Text style={[styles.macroLabel, { color: theme.colors.text }]}>
+            <Text style={[styles.macroLabel, { color: theme.colors.secondaryText }]}>
               Fat
             </Text>
           </View>
         </View>
         
-        <View style={styles.nutritionDetails}>
-          <View style={styles.nutritionRow}>
-            <Text style={[styles.nutritionLabel, { color: theme.colors.secondaryText }]}>
-              Fiber
-            </Text>
-            <Text style={[styles.nutritionValue, { color: theme.colors.text }]}>
-              {formatNutritionValue(foodData.fiber)}
-            </Text>
-          </View>
+        <Divider style={[styles.divider, { backgroundColor: theme.colors.border }]} />
+        
+        <View style={styles.detailsContainer}>
+          {foodData.serving_size && (
+            <View style={styles.detailItem}>
+              <Text style={[styles.detailLabel, { color: theme.colors.secondaryText }]}>
+                Serving Size
+              </Text>
+              <Text style={[styles.detailValue, { color: theme.colors.text }]}>
+                {foodData.serving_size}
+              </Text>
+            </View>
+          )}
           
-          <View style={styles.nutritionRow}>
-            <Text style={[styles.nutritionLabel, { color: theme.colors.secondaryText }]}>
-              Sugar
-            </Text>
-            <Text style={[styles.nutritionValue, { color: theme.colors.text }]}>
-              {formatNutritionValue(foodData.sugar)}
-            </Text>
-          </View>
+          {foodData.sugar !== undefined && (
+            <View style={styles.detailItem}>
+              <Text style={[styles.detailLabel, { color: theme.colors.secondaryText }]}>
+                Sugar
+              </Text>
+              <Text style={[styles.detailValue, { color: theme.colors.text }]}>
+                {foodData.sugar}g
+              </Text>
+            </View>
+          )}
           
-          <View style={styles.nutritionRow}>
-            <Text style={[styles.nutritionLabel, { color: theme.colors.secondaryText }]}>
-              Serving Size
-            </Text>
-            <Text style={[styles.nutritionValue, { color: theme.colors.text }]}>
-              {foodData.serving_size || '-'}
-            </Text>
-          </View>
+          {foodData.fiber !== undefined && (
+            <View style={styles.detailItem}>
+              <Text style={[styles.detailLabel, { color: theme.colors.secondaryText }]}>
+                Fiber
+              </Text>
+              <Text style={[styles.detailValue, { color: theme.colors.text }]}>
+                {foodData.fiber}g
+              </Text>
+            </View>
+          )}
         </View>
         
-        {foodData.ingredients && foodData.ingredients.length > 0 && (
-          <>
+        {foodData.ingredients && (
+          <View style={styles.ingredientsContainer}>
             <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
               Ingredients
             </Text>
-            <View style={styles.chipsContainer}>
-              {foodData.ingredients.map((ingredient, index) => (
-                <Chip 
-                  key={`ingredient-${index}`}
-                  style={[styles.chip, { backgroundColor: `${theme.colors.primary}20` }]}
-                  textStyle={{ color: theme.colors.text }}
-                >
-                  {ingredient}
-                </Chip>
-              ))}
+            <Text style={[styles.ingredientsText, { color: theme.colors.secondaryText }]}>
+              {formatIngredients(foodData.ingredients)}
+            </Text>
+          </View>
+        )}
+        
+        <View style={styles.infoContainer}>
+          {foodData.health_benefits && Array.isArray(foodData.health_benefits) && foodData.health_benefits.length > 0 && (
+            <View style={styles.infoSection}>
+              <View style={styles.infoHeader}>
+                <Feather name="heart" size={16} color={theme.colors.success} style={styles.infoIcon} />
+                <Text style={[styles.infoTitle, { color: theme.colors.text }]}>
+                  Health Benefits
+                </Text>
+              </View>
+              
+              <View style={styles.bulletList}>
+                {foodData.health_benefits.map((benefit, index) => (
+                  <View key={index} style={styles.bulletItem}>
+                    <Text style={[styles.bullet, { color: theme.colors.success }]}>•</Text>
+                    <Text style={[styles.bulletText, { color: theme.colors.secondaryText }]}>
+                      {benefit}
+                    </Text>
+                  </View>
+                ))}
+              </View>
             </View>
-          </>
-        )}
-        
-        {foodData.health_benefits && foodData.health_benefits.length > 0 && (
-          <>
-            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-              Health Benefits
-            </Text>
-            {foodData.health_benefits.map((benefit, index) => (
-              <View key={`benefit-${index}`} style={styles.listItem}>
-                <Feather 
-                  name="check-circle" 
-                  size={16} 
-                  color={theme.colors.success} 
-                  style={styles.listIcon} 
-                />
-                <Text style={[styles.listText, { color: theme.colors.text }]}>
-                  {benefit}
+          )}
+          
+          {foodData.concerns && Array.isArray(foodData.concerns) && foodData.concerns.length > 0 && (
+            <View style={styles.infoSection}>
+              <View style={styles.infoHeader}>
+                <Feather name="alert-circle" size={16} color={theme.colors.error} style={styles.infoIcon} />
+                <Text style={[styles.infoTitle, { color: theme.colors.text }]}>
+                  Health Concerns
                 </Text>
               </View>
-            ))}
-          </>
-        )}
-        
-        {foodData.concerns && foodData.concerns.length > 0 && (
-          <>
-            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-              Health Concerns
-            </Text>
-            {foodData.concerns.map((concern, index) => (
-              <View key={`concern-${index}`} style={styles.listItem}>
-                <Feather 
-                  name="alert-circle" 
-                  size={16} 
-                  color={theme.colors.warning} 
-                  style={styles.listIcon} 
-                />
-                <Text style={[styles.listText, { color: theme.colors.text }]}>
-                  {concern}
-                </Text>
+              
+              <View style={styles.bulletList}>
+                {foodData.concerns.map((concern, index) => (
+                  <View key={index} style={styles.bulletItem}>
+                    <Text style={[styles.bullet, { color: theme.colors.error }]}>•</Text>
+                    <Text style={[styles.bulletText, { color: theme.colors.secondaryText }]}>
+                      {concern}
+                    </Text>
+                  </View>
+                ))}
               </View>
-            ))}
-          </>
-        )}
-        
-        <View style={styles.methodInfo}>
-          <Feather 
-            name={foodData.method === 'image' ? 'camera' : 'type'} 
-            size={14} 
-            color={theme.colors.secondaryText} 
-          />
-          <Text style={[styles.methodText, { color: theme.colors.secondaryText }]}>
-            {foodData.method === 'image' 
-              ? 'Analyzed from image' 
-              : 'Analyzed from text description'}
-          </Text>
+            </View>
+          )}
         </View>
-      </ScrollView>
-      
-      <View style={styles.actions}>
-        {onCancel && (
+        
+        <View style={styles.buttonContainer}>
           <Button 
-            mode="outlined" 
+            mode="text" 
             onPress={onCancel}
-            style={[styles.button, styles.cancelButton]}
-            labelStyle={{ color: theme.colors.error }}
+            style={styles.button}
           >
             Cancel
           </Button>
-        )}
-        
-        {onAdjust && (
+          
           <Button 
             mode="outlined" 
             onPress={onAdjust}
             style={styles.button}
-            icon="edit-2"
           >
             Adjust
           </Button>
-        )}
-        
-        {onSave && (
+          
           <Button 
             mode="contained" 
             onPress={onSave}
-            style={[styles.button, styles.saveButton]}
-            icon="check"
+            style={styles.button}
           >
             Save
           </Button>
-        )}
-      </View>
-    </Surface>
+        </View>
+      </Surface>
+    </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    borderRadius: 12,
-    overflow: 'hidden',
-    elevation: 4,
-    maxHeight: '80%',
-  },
   scrollView: {
-    padding: 20,
+    flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    padding: 16,
+  },
+  container: {
+    borderRadius: 16,
+    padding: 16,
+    elevation: 4,
   },
   header: {
-    marginBottom: 20,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
   },
   title: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: 'bold',
-    marginBottom: 4,
+    flex: 1,
   },
-  calories: {
-    fontSize: 18,
-    fontWeight: '600',
+  methodChip: {
+    height: 28,
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginTop: 20,
-    marginBottom: 10,
+  calorieContainer: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  calorieValue: {
+    fontSize: 42,
+    fontWeight: 'bold',
+  },
+  calorieLabel: {
+    fontSize: 16,
   },
   macrosContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'space-around',
     marginBottom: 20,
   },
   macroItem: {
-    width: '30%',
-    borderWidth: 2,
-    borderRadius: 10,
-    padding: 12,
     alignItems: 'center',
   },
   macroValue: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
-    marginBottom: 4,
   },
   macroLabel: {
     fontSize: 14,
   },
-  nutritionDetails: {
-    marginTop: 10,
+  divider: {
+    marginVertical: 16,
   },
-  nutritionRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0,0,0,0.1)',
-  },
-  nutritionLabel: {
-    fontSize: 14,
-  },
-  nutritionValue: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  chipsContainer: {
+  detailsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginVertical: 10,
+    marginBottom: 16,
   },
-  chip: {
-    margin: 4,
+  detailItem: {
+    width: '33.3%',
+    paddingHorizontal: 4,
+    marginBottom: 12,
   },
-  listItem: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
+  detailLabel: {
+    fontSize: 12,
+  },
+  detailValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  ingredientsContainer: {
+    marginBottom: 16,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
     marginBottom: 8,
   },
-  listIcon: {
-    marginRight: 8,
-    marginTop: 2,
-  },
-  listText: {
-    flex: 1,
+  ingredientsText: {
     fontSize: 14,
     lineHeight: 20,
   },
-  methodInfo: {
+  infoContainer: {
+    marginBottom: 16,
+  },
+  infoSection: {
+    marginBottom: 12,
+  },
+  infoHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 20,
-    marginBottom: 10,
+    marginBottom: 8,
   },
-  methodText: {
-    fontSize: 12,
-    marginLeft: 6,
+  infoIcon: {
+    marginRight: 6,
   },
-  actions: {
+  infoTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  bulletList: {},
+  bulletItem: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(0,0,0,0.1)',
-    padding: 15,
+    marginBottom: 4,
+  },
+  bullet: {
+    fontSize: 16,
+    marginRight: 8,
+    marginTop: -2,
+  },
+  bulletText: {
+    fontSize: 14,
+    flex: 1,
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
   },
   button: {
-    marginLeft: 10,
-  },
-  saveButton: {
-    minWidth: 100,
-  },
-  cancelButton: {
-    borderColor: 'rgba(255,0,0,0.3)',
+    flex: 1,
+    marginHorizontal: 4,
   },
 });
 

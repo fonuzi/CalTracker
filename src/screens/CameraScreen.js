@@ -14,7 +14,6 @@ import {
 import { Text, useTheme, Button } from 'react-native-paper';
 import { Camera } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
-import * as ImageManipulator from 'expo-image-manipulator';
 import { Feather } from '@expo/vector-icons';
 import * as Animatable from 'react-native-animatable';
 
@@ -56,17 +55,10 @@ const CameraScreen = ({ navigation }) => {
   const takePicture = async () => {
     if (cameraRef.current) {
       try {
-        const photo = await cameraRef.current.takePictureAsync();
-        
-        // Resize image to reduce size for API
-        const resizedImage = await ImageManipulator.manipulateAsync(
-          photo.uri,
-          [{ resize: { width: 1000 } }],
-          { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG }
-        );
-        
-        setCapturedImage(resizedImage.uri);
-        analyzeImage(resizedImage.uri);
+        const photo = await cameraRef.current.takePictureAsync({ quality: 0.7 });
+        // Use the photo directly without manipulation for now
+        setCapturedImage(photo.uri);
+        analyzeImage(photo.uri);
       } catch (error) {
         console.error('Error taking picture:', error);
         Alert.alert('Error', 'Failed to take picture. Please try again.');
@@ -81,21 +73,14 @@ const CameraScreen = ({ navigation }) => {
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [4, 3],
-        quality: 0.8,
+        quality: 0.7,
       });
       
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const selectedImage = result.assets[0];
-        
-        // Resize image to reduce size for API
-        const resizedImage = await ImageManipulator.manipulateAsync(
-          selectedImage.uri,
-          [{ resize: { width: 1000 } }],
-          { compress: 0.8, format: ImageManipulator.SaveFormat.JPEG }
-        );
-        
-        setCapturedImage(resizedImage.uri);
-        analyzeImage(resizedImage.uri);
+        // Use the selected image directly without manipulation for now
+        setCapturedImage(selectedImage.uri);
+        analyzeImage(selectedImage.uri);
       }
     } catch (error) {
       console.error('Error picking image:', error);

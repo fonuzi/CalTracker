@@ -1,9 +1,7 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
-import { Text, useTheme } from 'react-native-paper';
+import { Text, Surface, useTheme, ProgressBar } from 'react-native-paper';
 import { Feather } from '@expo/vector-icons';
-import { AnimatedCircularProgress } from 'react-native-circular-progress';
-import * as Animatable from 'react-native-animatable';
 
 /**
  * A component to display the user's step count progress
@@ -11,158 +9,106 @@ import * as Animatable from 'react-native-animatable';
  * @param {number} goal - Step count goal
  * @param {Object} theme - Current theme
  */
-const StepCounter = ({ steps = 0, goal = 10000, theme }) => {
-  // Calculate the percentage of goal met
-  const percentage = Math.min(100, Math.round((steps / goal) * 100));
+const StepCounter = ({ steps, goal, theme }) => {
+  // Calculate percentage of goal
+  const percentage = Math.min(1, steps / goal);
   
-  // Estimate calories burned and distance walked
-  const caloriesBurned = Math.round(steps * 0.05); // rough estimate
-  const distanceKm = (steps * 0.0007).toFixed(2); // rough conversion assuming ~70cm stride
-  
-  // Format numbers for display
-  const formattedSteps = steps.toLocaleString();
-  const formattedGoal = goal.toLocaleString();
+  // Format number with commas
+  const formatNumber = (num) => {
+    return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  };
   
   return (
-    <View style={styles.container}>
-      <View style={styles.progressSection}>
-        <AnimatedCircularProgress
-          size={120}
-          width={10}
-          fill={percentage}
-          tintColor={theme.colors.primary}
-          backgroundColor={theme.colors.disabled}
-          rotation={0}
-          lineCap="round"
-        >
-          {() => (
-            <Animatable.View animation="pulse" easing="ease-out" iterationCount="infinite" style={styles.innerContent}>
-              <Feather name="activity" size={26} color={theme.colors.primary} />
-              <Text style={[styles.stepsText, { color: theme.colors.text }]}>
-                {formattedSteps}
-              </Text>
-              <Text style={[styles.stepsLabel, { color: theme.colors.secondaryText }]}>
-                steps
-              </Text>
-            </Animatable.View>
-          )}
-        </AnimatedCircularProgress>
-        
-        <View style={styles.goalContainer}>
-          <Text style={[styles.goalText, { color: theme.colors.secondaryText }]}>
-            Goal: {formattedGoal} steps
-          </Text>
-          <View style={styles.linearProgress}>
-            <View 
-              style={[
-                styles.linearProgressFill, 
-                { 
-                  backgroundColor: theme.colors.primary,
-                  width: `${percentage}%` 
-                }
-              ]} 
-            />
-          </View>
-          <Text style={[styles.percentageText, { color: theme.colors.primary }]}>
-            {percentage}% Complete
+    <Surface style={[styles.container, { backgroundColor: theme.colors.surface }]}>
+      <View style={styles.header}>
+        <View style={styles.titleContainer}>
+          <Feather name="activity" size={20} color={theme.colors.primary} style={styles.icon} />
+          <Text style={[styles.title, { color: theme.colors.text }]}>
+            Daily Steps
           </Text>
         </View>
+        
+        <Text style={[styles.goal, { color: theme.colors.secondaryText }]}>
+          Goal: {formatNumber(goal)}
+        </Text>
       </View>
       
-      <View style={styles.statsContainer}>
-        <View style={styles.statItem}>
-          <Feather name="zap" size={20} color={theme.colors.warning} />
-          <Text style={[styles.statValue, { color: theme.colors.text }]}>
-            {caloriesBurned}
-          </Text>
-          <Text style={[styles.statLabel, { color: theme.colors.secondaryText }]}>
-            calories
-          </Text>
-        </View>
-        
-        <View style={styles.statDivider} />
-        
-        <View style={styles.statItem}>
-          <Feather name="map" size={20} color={theme.colors.accent} />
-          <Text style={[styles.statValue, { color: theme.colors.text }]}>
-            {distanceKm}
-          </Text>
-          <Text style={[styles.statLabel, { color: theme.colors.secondaryText }]}>
-            kilometers
-          </Text>
-        </View>
+      <View style={styles.countContainer}>
+        <Text style={[styles.stepCount, { color: theme.colors.text }]}>
+          {formatNumber(steps)}
+        </Text>
+        <Text style={[styles.stepLabel, { color: theme.colors.secondaryText }]}>
+          steps
+        </Text>
       </View>
-    </View>
+      
+      <View style={styles.progressContainer}>
+        <ProgressBar 
+          progress={percentage} 
+          color={theme.colors.primary} 
+          style={styles.progressBar} 
+        />
+        
+        <Text style={[styles.percentage, { color: theme.colors.primary }]}>
+          {Math.round(percentage * 100)}%
+        </Text>
+      </View>
+    </Surface>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    width: '100%',
+    borderRadius: 16,
+    padding: 20,
+    marginVertical: 10,
+    elevation: 2,
   },
-  progressSection: {
+  header: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 20,
-  },
-  innerContent: {
     alignItems: 'center',
-    justifyContent: 'center',
+    marginBottom: 15,
   },
-  stepsText: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginTop: 5,
-  },
-  stepsLabel: {
-    fontSize: 12,
-  },
-  goalContainer: {
-    flex: 1,
-    paddingLeft: 20,
-  },
-  goalText: {
-    fontSize: 14,
-    marginBottom: 10,
-  },
-  linearProgress: {
-    height: 6,
-    backgroundColor: 'rgba(0,0,0,0.1)',
-    borderRadius: 3,
-    marginBottom: 5,
-    overflow: 'hidden',
-  },
-  linearProgressFill: {
-    height: '100%',
-    borderRadius: 3,
-  },
-  percentageText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  statsContainer: {
+  titleContainer: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(0,0,0,0.05)',
-    borderRadius: 12,
-    padding: 15,
-  },
-  statItem: {
-    flex: 1,
     alignItems: 'center',
   },
-  statValue: {
-    fontSize: 18,
+  icon: {
+    marginRight: 6,
+  },
+  title: {
+    fontSize: 16,
     fontWeight: 'bold',
+  },
+  goal: {
+    fontSize: 14,
+  },
+  countContainer: {
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  stepCount: {
+    fontSize: 42,
+    fontWeight: 'bold',
+  },
+  stepLabel: {
+    fontSize: 14,
     marginTop: 5,
   },
-  statLabel: {
-    fontSize: 12,
+  progressContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
-  statDivider: {
-    width: 1,
-    backgroundColor: 'rgba(0,0,0,0.1)',
-    marginHorizontal: 10,
+  progressBar: {
+    flex: 1,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 10,
+  },
+  percentage: {
+    fontSize: 14,
+    fontWeight: 'bold',
   },
 });
 

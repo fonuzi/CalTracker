@@ -1,7 +1,7 @@
 import * as FileSystem from 'expo-file-system';
 import OpenAI from 'openai';
 
-// Initialize OpenAI API with environment variable
+// Initialize OpenAI client with API key from environment variables
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
 /**
@@ -11,60 +11,59 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
  */
 export const analyzeFoodImage = async (imageUri) => {
   try {
-    // Convert the image to base64
+    // Read the image file as base64
     const base64Image = await FileSystem.readAsStringAsync(imageUri, {
       encoding: FileSystem.EncodingType.Base64,
     });
 
-    // Send the image to OpenAI API for analysis
+    // Prepare the prompt for image analysis
+    const prompt = `
+      Please analyze this food image and provide detailed nutritional information in JSON format.
+      Include the following fields:
+      - name: The name of the food
+      - calories: Total calories
+      - protein: Protein in grams
+      - carbs: Carbohydrates in grams
+      - fat: Fat in grams
+      - fiber: Fiber in grams
+      - sugar: Sugar in grams
+      - serving_size: Serving size (e.g., "1 cup", "100g")
+      - ingredients: Array of main ingredients
+      - health_benefits: Array of health benefits
+      - concerns: Array of potential health concerns or allergens
+      
+      Return only valid JSON with these fields.
+    `;
+
+    // Call the OpenAI API with the image
     const response = await openai.chat.completions.create({
       model: "gpt-4o", // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
       messages: [
         {
-          role: "system",
-          content: `You are a nutrition analysis expert. Analyze the image of food and provide detailed nutritional information in JSON format with the following structure:
-          {
-            "name": "Name of the food",
-            "calories": total calories,
-            "protein": grams of protein,
-            "carbs": grams of carbohydrates,
-            "fat": grams of fat,
-            "fiber": grams of fiber,
-            "sugar": grams of sugar,
-            "serving_size": "estimated serving size",
-            "ingredients": ["list", "of", "ingredients"],
-            "health_benefits": ["list", "of", "health", "benefits"],
-            "concerns": ["list", "of", "potential", "health", "concerns"]
-          }
-          
-          Make reasonable estimations based on what you can see in the image. If you're uncertain about specific values, provide your best estimate.`
-        },
-        {
           role: "user",
           content: [
-            {
-              type: "text",
-              text: "Analyze this food and provide detailed nutritional information."
-            },
+            { type: "text", text: prompt },
             {
               type: "image_url",
               image_url: {
-                url: `data:image/jpeg;base64,${base64Image}`
-              }
-            }
-          ]
-        }
+                url: `data:image/jpeg;base64,${base64Image}`,
+              },
+            },
+          ],
+        },
       ],
-      response_format: { type: "json_object" }
+      response_format: { type: "json_object" },
+      max_tokens: 1000,
     });
 
-    // Parse and return the result
+    // Parse and return the nutrition data
     const nutritionData = JSON.parse(response.choices[0].message.content);
-    return {
-      ...nutritionData,
-      analyzed_at: new Date().toISOString(),
-      method: 'image',
-    };
+    
+    // Add method information
+    nutritionData.method = 'image';
+    
+    return nutritionData;
+    
   } catch (error) {
     console.error('Error analyzing food image:', error);
     throw error;
@@ -78,43 +77,45 @@ export const analyzeFoodImage = async (imageUri) => {
  */
 export const analyzeFoodText = async (text) => {
   try {
+    // Prepare the prompt for text analysis
+    const prompt = `
+      Please analyze this food description and provide detailed nutritional information in JSON format.
+      Food description: "${text}"
+      
+      Include the following fields:
+      - name: The name of the food
+      - calories: Total calories
+      - protein: Protein in grams
+      - carbs: Carbohydrates in grams
+      - fat: Fat in grams
+      - fiber: Fiber in grams
+      - sugar: Sugar in grams
+      - serving_size: Serving size (e.g., "1 cup", "100g")
+      - ingredients: Array of main ingredients
+      - health_benefits: Array of health benefits
+      - concerns: Array of potential health concerns or allergens
+      
+      Return only valid JSON with these fields.
+    `;
+
+    // Call the OpenAI API
     const response = await openai.chat.completions.create({
       model: "gpt-4o", // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
       messages: [
-        {
-          role: "system",
-          content: `You are a nutrition analysis expert. Analyze the food description and provide detailed nutritional information in JSON format with the following structure:
-          {
-            "name": "Name of the food",
-            "calories": total calories,
-            "protein": grams of protein,
-            "carbs": grams of carbohydrates,
-            "fat": grams of fat,
-            "fiber": grams of fiber,
-            "sugar": grams of sugar,
-            "serving_size": "estimated serving size",
-            "ingredients": ["list", "of", "ingredients"],
-            "health_benefits": ["list", "of", "health", "benefits"],
-            "concerns": ["list", "of", "potential", "health", "concerns"]
-          }
-          
-          Make reasonable estimations based on the description. If you're uncertain about specific values, provide your best estimate.`
-        },
-        {
-          role: "user",
-          content: text
-        }
+        { role: "user", content: prompt }
       ],
-      response_format: { type: "json_object" }
+      response_format: { type: "json_object" },
+      max_tokens: 1000,
     });
 
-    // Parse and return the result
+    // Parse and return the nutrition data
     const nutritionData = JSON.parse(response.choices[0].message.content);
-    return {
-      ...nutritionData,
-      analyzed_at: new Date().toISOString(),
-      method: 'text',
-    };
+    
+    // Add method information
+    nutritionData.method = 'text';
+    
+    return nutritionData;
+    
   } catch (error) {
     console.error('Error analyzing food text:', error);
     throw error;
@@ -128,41 +129,65 @@ export const analyzeFoodText = async (text) => {
  */
 export const analyzeFitnessGoals = async (userData) => {
   try {
+    // Extract relevant data for the prompt
+    const {
+      name = '',
+      age = '',
+      gender = '',
+      weight = '',
+      height = '',
+      activityLevel = '',
+      fitnessGoal = '',
+      dietaryRestrictions = [],
+      bmi = '',
+      bmr = '',
+      tdee = '',
+      calorieGoal = '',
+      macroGoals = {}
+    } = userData;
+
+    // Prepare the prompt
+    const prompt = `
+      Please analyze this user's profile and fitness data to provide personalized recommendations.
+      
+      User Profile:
+      - Name: ${name}
+      - Age: ${age}
+      - Gender: ${gender}
+      - Weight: ${weight} kg
+      - Height: ${height} cm
+      - Activity Level: ${activityLevel}
+      - Fitness Goal: ${fitnessGoal}
+      - Dietary Restrictions: ${dietaryRestrictions.join(', ')}
+      
+      Health Metrics:
+      - BMI: ${bmi}
+      - BMR: ${bmr} calories/day
+      - TDEE: ${tdee} calories/day
+      - Calorie Goal: ${calorieGoal} calories/day
+      - Macro Goals: Protein: ${macroGoals.protein}g, Carbs: ${macroGoals.carbs}g, Fat: ${macroGoals.fat}g
+      
+      Based on this information, provide personalized recommendations in JSON format with these fields:
+      - recommendations: Array of 3-5 specific, actionable recommendations for diet and exercise
+      - meal_suggestions: Array of 3 meal ideas that match their goals and restrictions
+      - focus_areas: Array of 2-3 areas to focus on for best results
+      
+      Return only valid JSON with these fields.
+    `;
+
+    // Call the OpenAI API
     const response = await openai.chat.completions.create({
       model: "gpt-4o", // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
       messages: [
-        {
-          role: "system",
-          content: `You are a fitness and nutrition expert. Analyze the user's profile data and provide personalized recommendations in JSON format with the following structure:
-          {
-            "recommendedCalories": daily calorie target (number),
-            "macroBreakdown": {
-              "protein": percentage of protein (number),
-              "carbs": percentage of carbohydrates (number),
-              "fat": percentage of fat (number)
-            },
-            "proteinGrams": daily protein target in grams (number),
-            "carbsGrams": daily carbohydrates target in grams (number),
-            "fatGrams": daily fat target in grams (number),
-            "recommendedMeals": [
-              { "name": "meal name", "timing": "time of day", "description": "description" }
-            ],
-            "recommendations": ["list", "of", "personalized", "recommendations"],
-            "warnings": ["list", "of", "health", "warnings", "if", "applicable"]
-          }
-          
-          Calculate values based on established nutrition and fitness guidelines. If the user's goal is weight loss, aim for a moderate calorie deficit. If it's muscle gain, recommend a slight calorie surplus.`
-        },
-        {
-          role: "user",
-          content: JSON.stringify(userData)
-        }
+        { role: "user", content: prompt }
       ],
-      response_format: { type: "json_object" }
+      response_format: { type: "json_object" },
+      max_tokens: 1000,
     });
 
-    // Parse and return the result
+    // Parse and return the recommendations
     return JSON.parse(response.choices[0].message.content);
+    
   } catch (error) {
     console.error('Error analyzing fitness goals:', error);
     throw error;

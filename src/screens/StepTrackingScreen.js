@@ -1,302 +1,312 @@
-import React, { useState, useEffect, useContext } from 'react';
-import { StyleSheet, View, ScrollView, Dimensions, RefreshControl } from 'react-native';
-import { Text, Card, Button, Avatar, useTheme, Title, Divider, ProgressBar } from 'react-native-paper';
+import React, { useState, useEffect, useContext, useRef } from 'react';
+import { 
+  View, 
+  StyleSheet, 
+  Dimensions, 
+  ScrollView, 
+  TouchableOpacity,
+  RefreshControl
+} from 'react-native';
+import { Text, Surface, useTheme, Button } from 'react-native-paper';
 import { LineChart } from 'react-native-chart-kit';
 import { Feather } from '@expo/vector-icons';
-import { useFocusEffect } from '@react-navigation/native';
-import { getStepsForToday, getStepsForPastWeek, checkHealthKitPermissions, requestHealthKitPermissions } from '../services/HealthKitService';
-import { calculateCaloriesBurned } from '../utils/calculators';
-import { UserContext } from '../context/UserContext';
+import * as Animatable from 'react-native-animatable';
+
+// Import custom components and services
 import StepCounter from '../components/StepCounter';
+import { UserContext } from '../context/UserContext';
+import { 
+  getStepsForToday, 
+  getStepsForPastWeek, 
+  subscribeToStepUpdates,
+  requestHealthKitPermissions
+} from '../services/HealthKitService';
+import { calculateCaloriesBurned, stepsToDistance } from '../utils/calculators';
+
+const { width } = Dimensions.get('window');
 
 const StepTrackingScreen = () => {
   const theme = useTheme();
   const { userProfile } = useContext(UserContext);
-  const [refreshing, setRefreshing] = useState(false);
-  const [hasPermissions, setHasPermissions] = useState(false);
+  const animationRef = useRef(null);
+  
+  // State
   const [steps, setSteps] = useState(0);
   const [weeklySteps, setWeeklySteps] = useState([]);
-  const [weekLabels, setWeekLabels] = useState([]);
-  const [distance, setDistance] = useState(0);
-  const [caloriesBurned, setCaloriesBurned] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [hasPermission, setHasPermission] = useState(null);
   
-  const stepGoal = userProfile?.stepGoal || 10000;
-  const weight = userProfile?.weight ? parseFloat(userProfile.weight) : 70; // Default weight in kg
-  const height = userProfile?.height ? parseFloat(userProfile.height) : 170; // Default height in cm
+  // Effect to check permissions and load step data on mount
+  useEffect(() => {
+    const checkPermissionsAndLoadData = async () => {
+      try {
+        // Request permissions
+        const permissionResult = await requestHealthKitPermissions();
+        setHasPermission(permissionResult);
+        
+        if (permissionResult) {
+          // Load step data
+          await loadStepData();
+        }
+      } catch (error) {
+        console.error('Error setting up step tracking:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    checkPermissionsAndLoadData();
+  }, []);
   
-  const checkPermissions = async () => {
-    const granted = await checkHealthKitPermissions();
-    setHasPermissions(granted);
-    return granted;
-  };
-
+  // Effect to subscribe to step updates
+  useEffect(() => {
+    if (!hasPermission) return;
+    
+    // Subscribe to step updates
+    const subscription = subscribeToStepUpdates(newSteps => {
+      setSteps(prevSteps => {
+        const updatedSteps = prevSteps + newSteps;
+        
+        // Play animation if steps increased
+        if (newSteps > 0 && animationRef.current) {
+          animationRef.current.pulse(800);
+        }
+        
+        return updatedSteps;
+      });
+    });
+    
+    // Clean up subscription
+    return () => {
+      if (subscription) {
+        subscription.remove();
+      }
+    };
+  }, [hasPermission]);
+  
+  // Function to load step data
   const loadStepData = async () => {
     setRefreshing(true);
     
     try {
-      const hasPermission = await checkPermissions();
+      // Get today's steps
+      const todaySteps = await getStepsForToday();
+      setSteps(todaySteps);
       
-      if (hasPermission) {
-        // Get today's steps
-        const todaySteps = await getStepsForToday();
-        setSteps(todaySteps);
-        
-        // Calculate approximate distance (rough estimate)
-        // Average stride length is about 0.762 meters for a person who is 1.7m tall
-        const strideLength = height * 0.00045; // Rough formula: height * 0.00045
-        const distanceInKm = (todaySteps * strideLength) / 1000;
-        setDistance(distanceInKm);
-        
-        // Calculate calories burned from steps
-        const burned = calculateCaloriesBurned(todaySteps, weight);
-        setCaloriesBurned(burned);
-        
-        // Get weekly data
-        const weekData = await getStepsForPastWeek();
-        
-        // Format data for chart
-        const stepCounts = weekData.map(day => day.steps);
-        setWeeklySteps(stepCounts);
-        
-        // Generate day labels for the chart
-        const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-        const labels = weekData.map(day => days[new Date(day.date).getDay()]);
-        setWeekLabels(labels);
-      }
+      // Get weekly step data
+      const weekSteps = await getStepsForPastWeek();
+      setWeeklySteps(weekSteps);
     } catch (error) {
       console.error('Error loading step data:', error);
     } finally {
       setRefreshing(false);
     }
   };
-
-  useFocusEffect(
-    React.useCallback(() => {
-      loadStepData();
-    }, [])
-  );
-
+  
+  // Function to handle requesting permissions
   const handleRequestPermissions = async () => {
     try {
-      const granted = await requestHealthKitPermissions();
-      setHasPermissions(granted);
+      const result = await requestHealthKitPermissions();
+      setHasPermission(result);
       
-      if (granted) {
-        loadStepData();
+      if (result) {
+        // Load step data after getting permissions
+        await loadStepData();
       }
     } catch (error) {
-      console.error('Error requesting permissions:', error);
+      console.error('Error requesting pedometer permissions:', error);
     }
   };
-
-  const onRefresh = () => {
-    loadStepData();
+  
+  // Function to handle refreshing
+  const onRefresh = async () => {
+    await loadStepData();
   };
-
-  const renderPermissionRequest = () => (
-    <View style={styles.permissionContainer}>
-      <Avatar.Icon 
-        size={80} 
-        icon={(props) => <Feather name="activity" {...props} />} 
-        style={{ backgroundColor: theme.colors.primary }} 
-      />
-      <Text style={[styles.permissionTitle, { color: theme.colors.text }]}>
-        Access to Health Data Required
-      </Text>
-      <Text style={[styles.permissionText, { color: theme.colors.text }]}>
-        We need permission to access your step count data to track your activity.
-      </Text>
-      <Button 
-        mode="contained" 
-        onPress={handleRequestPermissions}
-        style={styles.permissionButton}
-      >
-        Grant Permission
-      </Button>
-    </View>
+  
+  // Calculate stats
+  const caloriesBurned = calculateCaloriesBurned(
+    steps,
+    userProfile?.weight || 70
   );
-
+  
+  const distanceKm = stepsToDistance(
+    steps,
+    userProfile?.height || 170
+  );
+  
+  const stepGoal = userProfile?.stepGoal || 10000;
+  const stepPercentage = Math.min(100, Math.round((steps / stepGoal) * 100));
+  
+  // Generate chart data
+  const chartData = {
+    labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].slice(-weeklySteps.length),
+    datasets: [
+      {
+        data: weeklySteps.length > 0 ? weeklySteps : [0, 0, 0, 0, 0, 0, 0],
+        color: () => theme.colors.primary,
+        strokeWidth: 2
+      }
+    ],
+  };
+  
+  // If permission not granted
+  if (hasPermission === false) {
+    return (
+      <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+        <View style={styles.permissionContainer}>
+          <Feather 
+            name="activity" 
+            size={70} 
+            color={theme.colors.primary} 
+            style={styles.permissionIcon} 
+          />
+          <Text style={[styles.permissionTitle, { color: theme.colors.text }]}>
+            Step Tracking Permissions
+          </Text>
+          <Text style={[styles.permissionText, { color: theme.colors.secondaryText }]}>
+            NutriTrack needs access to your step data to track your daily activity and provide better insights.
+          </Text>
+          <Button
+            mode="contained"
+            onPress={handleRequestPermissions}
+            style={styles.permissionButton}
+          >
+            Enable Step Tracking
+          </Button>
+        </View>
+      </View>
+    );
+  }
+  
   return (
-    <ScrollView 
+    <ScrollView
       style={[styles.container, { backgroundColor: theme.colors.background }]}
+      contentContainerStyle={styles.contentContainer}
       refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          colors={[theme.colors.primary]}
+          tintColor={theme.colors.primary}
+        />
       }
     >
-      {hasPermissions ? (
-        <>
-          {/* Today's steps card */}
-          <Card style={[styles.card, { backgroundColor: theme.colors.surface }]}>
-            <Card.Content>
-              <Title style={{ color: theme.colors.text }}>Today's Steps</Title>
-              <StepCounter 
-                steps={steps} 
-                goal={stepGoal}
-                theme={theme}
-                large
-              />
-              
-              <View style={styles.statsRow}>
-                <View style={styles.statItem}>
-                  <Feather name="map-pin" size={24} color={theme.colors.primary} />
-                  <View style={styles.statText}>
-                    <Text style={styles.statValue}>{distance.toFixed(2)} km</Text>
-                    <Text style={styles.statLabel}>Distance</Text>
-                  </View>
-                </View>
-                
-                <View style={styles.statItem}>
-                  <Feather name="zap" size={24} color={theme.colors.primary} />
-                  <View style={styles.statText}>
-                    <Text style={styles.statValue}>{caloriesBurned} kcal</Text>
-                    <Text style={styles.statLabel}>Calories</Text>
-                  </View>
-                </View>
-              </View>
-            </Card.Content>
-          </Card>
-          
-          {/* Weekly activity card */}
-          <Card style={[styles.card, { backgroundColor: theme.colors.surface }]}>
-            <Card.Content>
-              <Title style={{ color: theme.colors.text, marginBottom: 15 }}>Weekly Activity</Title>
-              {weeklySteps.length > 0 ? (
-                <LineChart
-                  data={{
-                    labels: weekLabels,
-                    datasets: [
-                      {
-                        data: weeklySteps,
-                      }
-                    ]
-                  }}
-                  width={Dimensions.get("window").width - 60}
-                  height={220}
-                  yAxisLabel=""
-                  yAxisSuffix=" steps"
-                  yAxisInterval={1}
-                  chartConfig={{
-                    backgroundColor: theme.colors.surface,
-                    backgroundGradientFrom: theme.colors.surface,
-                    backgroundGradientTo: theme.colors.surface,
-                    decimalPlaces: 0,
-                    color: (opacity = 1) => `rgba(${theme.colors.primary.replace(/[^\d,]/g, '')}, ${opacity})`,
-                    labelColor: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
-                    style: {
-                      borderRadius: 16
-                    },
-                    propsForDots: {
-                      r: "6",
-                      strokeWidth: "2",
-                      stroke: theme.colors.accent
-                    }
-                  }}
-                  bezier
-                  style={{
-                    marginVertical: 8,
-                    borderRadius: 16
-                  }}
-                />
-              ) : (
-                <View style={styles.noDataContainer}>
-                  <Text style={{ color: theme.colors.text, textAlign: 'center' }}>
-                    No step data available for the past week.
-                  </Text>
-                </View>
-              )}
-            </Card.Content>
-          </Card>
-          
-          {/* Activity insights card */}
-          <Card style={[styles.card, { backgroundColor: theme.colors.surface }]}>
-            <Card.Content>
-              <Title style={{ color: theme.colors.text }}>Activity Insights</Title>
-              <Divider style={styles.divider} />
-              
-              <View style={styles.insightItem}>
-                <View style={styles.insightHeader}>
-                  <Feather name="trending-up" size={20} color={theme.colors.primary} />
-                  <Text style={[styles.insightTitle, { color: theme.colors.text }]}>Daily Average</Text>
-                </View>
-                <Text style={styles.insightValue}>
-                  {weeklySteps.length > 0 
-                    ? Math.round(weeklySteps.reduce((sum, current) => sum + current, 0) / weeklySteps.length) 
-                    : 0} steps
-                </Text>
-                <ProgressBar 
-                  progress={weeklySteps.length > 0 
-                    ? Math.min(1, (weeklySteps.reduce((sum, current) => sum + current, 0) / weeklySteps.length) / stepGoal) 
-                    : 0} 
-                  color={theme.colors.primary} 
-                  style={styles.progressBar} 
-                />
-              </View>
-              
-              <View style={styles.insightItem}>
-                <View style={styles.insightHeader}>
-                  <Feather name="award" size={20} color={theme.colors.primary} />
-                  <Text style={[styles.insightTitle, { color: theme.colors.text }]}>Best Day</Text>
-                </View>
-                <Text style={styles.insightValue}>
-                  {weeklySteps.length > 0 
-                    ? Math.max(...weeklySteps) 
-                    : 0} steps
-                </Text>
-                <ProgressBar 
-                  progress={weeklySteps.length > 0 
-                    ? Math.min(1, Math.max(...weeklySteps) / stepGoal) 
-                    : 0} 
-                  color={theme.colors.primary} 
-                  style={styles.progressBar} 
-                />
-              </View>
-              
-              <Divider style={styles.divider} />
-              
-              <Text style={styles.tipText}>
-                <Text style={{ fontWeight: 'bold', color: theme.colors.primary }}>Tip: </Text>
-                Try to take a 5-minute walking break every hour during your day to increase your step count.
-              </Text>
-            </Card.Content>
-          </Card>
-          
-          {/* Activity goals card */}
-          <Card style={[styles.card, { backgroundColor: theme.colors.surface }]}>
-            <Card.Content>
-              <Title style={{ color: theme.colors.text }}>Activity Goals</Title>
-              <Text style={styles.goalText}>
-                Your current daily step goal is <Text style={{ fontWeight: 'bold', color: theme.colors.primary }}>{stepGoal.toLocaleString()} steps</Text>
-              </Text>
-              
-              <View style={styles.healthBenefitsContainer}>
-                <Text style={[styles.healthBenefitsTitle, { color: theme.colors.text }]}>
-                  Health Benefits
-                </Text>
-                <View style={styles.benefitItem}>
-                  <Feather name="heart" size={16} color={theme.colors.primary} style={styles.benefitIcon} />
-                  <Text style={styles.benefitText}>Improved cardiovascular health</Text>
-                </View>
-                <View style={styles.benefitItem}>
-                  <Feather name="battery-charging" size={16} color={theme.colors.primary} style={styles.benefitIcon} />
-                  <Text style={styles.benefitText}>Increased energy levels</Text>
-                </View>
-                <View style={styles.benefitItem}>
-                  <Feather name="smile" size={16} color={theme.colors.primary} style={styles.benefitIcon} />
-                  <Text style={styles.benefitText}>Enhanced mood and mental wellbeing</Text>
-                </View>
-                <View style={styles.benefitItem}>
-                  <Feather name="moon" size={16} color={theme.colors.primary} style={styles.benefitIcon} />
-                  <Text style={styles.benefitText}>Better sleep quality</Text>
-                </View>
-              </View>
-            </Card.Content>
-          </Card>
-        </>
-      ) : (
-        renderPermissionRequest()
-      )}
+      {/* Step Counter */}
+      <Animatable.View ref={animationRef}>
+        <StepCounter
+          steps={steps}
+          goal={stepGoal}
+          theme={theme}
+        />
+      </Animatable.View>
       
-      <View style={styles.bottomPadding} />
+      {/* Stats Cards */}
+      <View style={styles.statsContainer}>
+        <Surface style={[styles.statCard, { backgroundColor: theme.colors.surface }]}>
+          <View style={styles.statContent}>
+            <Feather name="zap" size={24} color={theme.colors.warning} />
+            <Text style={[styles.statValue, { color: theme.colors.text }]}>
+              {caloriesBurned}
+            </Text>
+            <Text style={[styles.statLabel, { color: theme.colors.secondaryText }]}>
+              CALORIES BURNED
+            </Text>
+          </View>
+        </Surface>
+        
+        <Surface style={[styles.statCard, { backgroundColor: theme.colors.surface }]}>
+          <View style={styles.statContent}>
+            <Feather name="map" size={24} color={theme.colors.info} />
+            <Text style={[styles.statValue, { color: theme.colors.text }]}>
+              {distanceKm}
+            </Text>
+            <Text style={[styles.statLabel, { color: theme.colors.secondaryText }]}>
+              KM WALKED
+            </Text>
+          </View>
+        </Surface>
+      </View>
+      
+      {/* Weekly Progress Chart */}
+      <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+        Weekly Steps
+      </Text>
+      
+      <Surface style={[styles.chartCard, { backgroundColor: theme.colors.surface }]}>
+        <LineChart
+          data={chartData}
+          width={width - 32}
+          height={220}
+          chartConfig={{
+            backgroundColor: theme.colors.surface,
+            backgroundGradientFrom: theme.colors.surface,
+            backgroundGradientTo: theme.colors.surface,
+            decimalPlaces: 0,
+            color: (opacity = 1) => `rgba(139, 92, 246, ${opacity})`, // Primary color with opacity
+            labelColor: () => theme.colors.secondaryText,
+            style: {
+              borderRadius: 16,
+            },
+            propsForDots: {
+              r: '4',
+              stroke: theme.colors.primary,
+              strokeWidth: '2',
+            },
+          }}
+          style={styles.chart}
+          bezier
+        />
+      </Surface>
+      
+      {/* Activity Insights */}
+      <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+        Activity Insights
+      </Text>
+      
+      <Surface style={[styles.insightsCard, { backgroundColor: theme.colors.surface }]}>
+        <View style={styles.insightRow}>
+          <Feather 
+            name={stepPercentage >= 100 ? 'award' : 'trending-up'} 
+            size={24} 
+            color={stepPercentage >= 100 ? theme.colors.success : theme.colors.primary} 
+            style={styles.insightIcon}
+          />
+          <View style={styles.insightTextContainer}>
+            <Text style={[styles.insightTitle, { color: theme.colors.text }]}>
+              {stepPercentage >= 100 
+                ? 'Daily Goal Achieved!'
+                : `${stepPercentage}% of Daily Goal`
+              }
+            </Text>
+            <Text style={[styles.insightDescription, { color: theme.colors.secondaryText }]}>
+              {stepPercentage >= 100
+                ? 'Great job on meeting your step goal today!'
+                : `You need ${stepGoal - steps} more steps to reach your goal of ${stepGoal} steps.`
+              }
+            </Text>
+          </View>
+        </View>
+        
+        <View style={[styles.divider, { backgroundColor: theme.colors.border }]} />
+        
+        <View style={styles.insightRow}>
+          <Feather 
+            name="zap" 
+            size={24} 
+            color={theme.colors.warning} 
+            style={styles.insightIcon}
+          />
+          <View style={styles.insightTextContainer}>
+            <Text style={[styles.insightTitle, { color: theme.colors.text }]}>
+              Calories Burned
+            </Text>
+            <Text style={[styles.insightDescription, { color: theme.colors.secondaryText }]}>
+              You've burned approximately {caloriesBurned} calories through walking today.
+            </Text>
+          </View>
+        </View>
+      </Surface>
     </ScrollView>
   );
 };
@@ -304,126 +314,102 @@ const StepTrackingScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  contentContainer: {
     padding: 16,
   },
-  card: {
-    marginBottom: 16,
+  statsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 16,
+    marginBottom: 24,
+  },
+  statCard: {
+    width: '48%',
     borderRadius: 12,
-    elevation: 4,
+    padding: 16,
+    elevation: 2,
   },
-  statsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginTop: 20,
-  },
-  statItem: {
-    flexDirection: 'row',
+  statContent: {
     alignItems: 'center',
   },
-  statText: {
-    marginLeft: 10,
-  },
   statValue: {
-    fontSize: 18,
+    fontSize: 24,
     fontWeight: 'bold',
-    color: '#fff',
+    marginVertical: 8,
   },
   statLabel: {
     fontSize: 12,
-    opacity: 0.7,
-    color: '#fff',
+    textAlign: 'center',
   },
-  noDataContainer: {
-    height: 220,
-    justifyContent: 'center',
-    alignItems: 'center',
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 12,
   },
-  divider: {
-    marginVertical: 15,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+  chartCard: {
+    borderRadius: 12,
+    padding: 12,
+    marginBottom: 24,
+    elevation: 2,
   },
-  insightItem: {
-    marginBottom: 20,
+  chart: {
+    borderRadius: 12,
+    padding: 0,
   },
-  insightHeader: {
+  insightsCard: {
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 24,
+    elevation: 2,
+  },
+  insightRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 5,
+    paddingVertical: 8,
+  },
+  insightIcon: {
+    marginRight: 16,
+  },
+  insightTextContainer: {
+    flex: 1,
   },
   insightTitle: {
     fontSize: 16,
-    marginLeft: 5,
-  },
-  insightValue: {
-    fontSize: 18,
     fontWeight: 'bold',
-    color: '#fff',
-    marginVertical: 5,
+    marginBottom: 4,
   },
-  progressBar: {
-    height: 8,
-    borderRadius: 4,
-  },
-  tipText: {
+  insightDescription: {
     fontSize: 14,
-    color: '#fff',
-    opacity: 0.8,
-    fontStyle: 'italic',
+    lineHeight: 20,
   },
-  goalText: {
-    fontSize: 16,
-    marginVertical: 10,
-    color: '#fff',
-  },
-  healthBenefitsContainer: {
-    marginTop: 15,
-    padding: 15,
-    backgroundColor: 'rgba(255,255,255,0.05)',
-    borderRadius: 8,
-  },
-  healthBenefitsTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 10,
-  },
-  benefitItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  benefitIcon: {
-    marginRight: 10,
-  },
-  benefitText: {
-    fontSize: 14,
-    color: '#fff',
-    opacity: 0.9,
+  divider: {
+    height: 1,
+    marginVertical: 12,
   },
   permissionContainer: {
     flex: 1,
-    justifyContent: 'center',
     alignItems: 'center',
-    padding: 30,
-    marginTop: 50,
+    justifyContent: 'center',
+    padding: 20,
+  },
+  permissionIcon: {
+    marginBottom: 20,
   },
   permissionTitle: {
     fontSize: 22,
     fontWeight: 'bold',
+    marginBottom: 12,
     textAlign: 'center',
-    marginTop: 20,
-    marginBottom: 10,
   },
   permissionText: {
     fontSize: 16,
+    marginBottom: 24,
     textAlign: 'center',
-    marginBottom: 30,
-    opacity: 0.8,
+    lineHeight: 24,
   },
   permissionButton: {
-    paddingHorizontal: 30,
-  },
-  bottomPadding: {
-    height: 80,
+    paddingHorizontal: 16,
   },
 });
 

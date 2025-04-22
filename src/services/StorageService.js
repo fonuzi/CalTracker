@@ -1,14 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Storage keys
-const STORAGE_KEYS = {
-  USER_PROFILE: 'nutritrack_user_profile',
-  FOOD_LOGS: 'nutritrack_food_logs',
-  FOOD_LOG_DATES: 'nutritrack_food_log_dates',
-  WATER_LOGS: 'nutritrack_water_logs',
-  WEIGHT_LOGS: 'nutritrack_weight_logs',
-  APP_SETTINGS: 'nutritrack_app_settings',
-};
+// Keys for AsyncStorage
+const USER_PROFILE_KEY = 'nutritrack_user_profile';
+const FOOD_LOG_KEY_PREFIX = 'nutritrack_food_log_';
+const FOOD_LOG_DATES_KEY = 'nutritrack_food_log_dates';
+const APP_SETTINGS_KEY = 'nutritrack_app_settings';
 
 /**
  * Saves a user profile to local storage
@@ -17,8 +13,7 @@ const STORAGE_KEYS = {
  */
 export const saveUserProfile = async (profile) => {
   try {
-    const jsonValue = JSON.stringify(profile);
-    await AsyncStorage.setItem(STORAGE_KEYS.USER_PROFILE, jsonValue);
+    await AsyncStorage.setItem(USER_PROFILE_KEY, JSON.stringify(profile));
   } catch (error) {
     console.error('Error saving user profile:', error);
     throw error;
@@ -31,11 +26,11 @@ export const saveUserProfile = async (profile) => {
  */
 export const getUserProfile = async () => {
   try {
-    const jsonValue = await AsyncStorage.getItem(STORAGE_KEYS.USER_PROFILE);
-    return jsonValue != null ? JSON.parse(jsonValue) : null;
+    const profileString = await AsyncStorage.getItem(USER_PROFILE_KEY);
+    return profileString ? JSON.parse(profileString) : null;
   } catch (error) {
     console.error('Error getting user profile:', error);
-    return null;
+    throw error;
   }
 };
 
@@ -46,29 +41,34 @@ export const getUserProfile = async () => {
  */
 export const saveFoodLog = async (food) => {
   try {
-    // Generate ID if not provided
-    const foodToSave = {
-      ...food,
-      id: food.id || `food_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      timestamp: food.timestamp || new Date().toISOString(),
-    };
-
-    // Get the date for storing (YYYY-MM-DD)
-    const date = foodToSave.date || new Date(foodToSave.timestamp).toISOString().split('T')[0];
+    // Ensure the food object has an ID
+    if (!food.id) {
+      food.id = 'food_' + Date.now() + '_' + Math.random().toString(36).substring(2, 9);
+    }
     
-    // Add date to the food object if not present
-    foodToSave.date = date;
-
-    // Get existing logs for this date
+    // Get the date from the food entry's timestamp
+    const date = food.timestamp ? new Date(food.timestamp).toISOString().split('T')[0] : new Date().toISOString().split('T')[0];
+    
+    // Get existing food logs for this date
     const existingLogs = await getFoodLogs(date);
     
-    // Add new log
-    const updatedLogs = [...existingLogs, foodToSave];
+    // Find if this food already exists (for update case)
+    const index = existingLogs.findIndex(item => item.id === food.id);
+    
+    let updatedLogs;
+    if (index >= 0) {
+      // Update existing food log
+      updatedLogs = [...existingLogs];
+      updatedLogs[index] = food;
+    } else {
+      // Add new food log
+      updatedLogs = [...existingLogs, food];
+    }
     
     // Save updated logs
-    await AsyncStorage.setItem(`${STORAGE_KEYS.FOOD_LOGS}_${date}`, JSON.stringify(updatedLogs));
+    await AsyncStorage.setItem(FOOD_LOG_KEY_PREFIX + date, JSON.stringify(updatedLogs));
     
-    // Update list of dates with food logs
+    // Update the list of dates that have food logs
     await updateFoodLogDates(date);
   } catch (error) {
     console.error('Error saving food log:', error);
@@ -83,11 +83,11 @@ export const saveFoodLog = async (food) => {
  */
 export const getFoodLogs = async (date) => {
   try {
-    const jsonValue = await AsyncStorage.getItem(`${STORAGE_KEYS.FOOD_LOGS}_${date}`);
-    return jsonValue != null ? JSON.parse(jsonValue) : [];
+    const logsString = await AsyncStorage.getItem(FOOD_LOG_KEY_PREFIX + date);
+    return logsString ? JSON.parse(logsString) : [];
   } catch (error) {
-    console.error(`Error getting food logs for ${date}:`, error);
-    return [];
+    console.error('Error getting food logs:', error);
+    throw error;
   }
 };
 
@@ -98,32 +98,29 @@ export const getFoodLogs = async (date) => {
  */
 export const deleteFoodLog = async (id) => {
   try {
-    // Get list of dates with food logs
+    // Get all dates that have food logs
     const dates = await getFoodLogDates();
     
-    // For each date, check if the food log exists
+    // Check each date for the food log
     for (const date of dates) {
       const logs = await getFoodLogs(date);
-      const logIndex = logs.findIndex(log => log.id === id);
+      const filteredLogs = logs.filter(log => log.id !== id);
       
-      if (logIndex !== -1) {
-        // Remove the log
-        logs.splice(logIndex, 1);
+      // If the logs changed, update storage
+      if (filteredLogs.length !== logs.length) {
+        await AsyncStorage.setItem(FOOD_LOG_KEY_PREFIX + date, JSON.stringify(filteredLogs));
         
-        // Save updated logs
-        await AsyncStorage.setItem(`${STORAGE_KEYS.FOOD_LOGS}_${date}`, JSON.stringify(logs));
-        
-        // If no logs left for this date, remove it from the dates list
-        if (logs.length === 0) {
+        // If no logs remain for this date, remove the date from the list
+        if (filteredLogs.length === 0) {
           const updatedDates = dates.filter(d => d !== date);
-          await AsyncStorage.setItem(STORAGE_KEYS.FOOD_LOG_DATES, JSON.stringify(updatedDates));
+          await AsyncStorage.setItem(FOOD_LOG_DATES_KEY, JSON.stringify(updatedDates));
         }
         
         break;
       }
     }
   } catch (error) {
-    console.error(`Error deleting food log ${id}:`, error);
+    console.error('Error deleting food log:', error);
     throw error;
   }
 };
@@ -134,11 +131,11 @@ export const deleteFoodLog = async (id) => {
  */
 export const getFoodLogDates = async () => {
   try {
-    const jsonValue = await AsyncStorage.getItem(STORAGE_KEYS.FOOD_LOG_DATES);
-    return jsonValue != null ? JSON.parse(jsonValue) : [];
+    const datesString = await AsyncStorage.getItem(FOOD_LOG_DATES_KEY);
+    return datesString ? JSON.parse(datesString) : [];
   } catch (error) {
     console.error('Error getting food log dates:', error);
-    return [];
+    throw error;
   }
 };
 
@@ -150,15 +147,16 @@ export const getFoodLogDates = async () => {
  */
 const updateFoodLogDates = async (date) => {
   try {
+    // Get existing dates
     const dates = await getFoodLogDates();
     
+    // Add the date if it doesn't exist
     if (!dates.includes(date)) {
       dates.push(date);
-      dates.sort(); // Keep dates sorted chronologically
-      await AsyncStorage.setItem(STORAGE_KEYS.FOOD_LOG_DATES, JSON.stringify(dates));
+      await AsyncStorage.setItem(FOOD_LOG_DATES_KEY, JSON.stringify(dates));
     }
   } catch (error) {
-    console.error(`Error updating food log dates with ${date}:`, error);
+    console.error('Error updating food log dates:', error);
     throw error;
   }
 };
@@ -171,30 +169,28 @@ const updateFoodLogDates = async (date) => {
  */
 export const getFoodLogsForDateRange = async (startDate, endDate) => {
   try {
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    const result = {};
+    
     // Get all dates with food logs
     const allDates = await getFoodLogDates();
     
-    // Filter dates to the specified range
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    
-    const datesInRange = allDates.filter(date => {
-      const current = new Date(date);
-      return current >= start && current <= end;
+    // Filter dates within the range
+    const datesInRange = allDates.filter(dateStr => {
+      const date = new Date(dateStr);
+      return date >= start && date <= end;
     });
     
-    // Get logs for each date
-    const result = {};
-    
+    // Get food logs for each date
     for (const date of datesInRange) {
-      const logs = await getFoodLogs(date);
-      result[date] = logs;
+      result[date] = await getFoodLogs(date);
     }
     
     return result;
   } catch (error) {
-    console.error(`Error getting food logs for date range ${startDate} to ${endDate}:`, error);
-    return {};
+    console.error('Error getting food logs for date range:', error);
+    throw error;
   }
 };
 
@@ -205,14 +201,13 @@ export const getFoodLogsForDateRange = async (startDate, endDate) => {
  */
 export const saveAppSettings = async (settings) => {
   try {
-    // Get current settings
-    const currentSettings = await getAppSettings();
+    // Get existing settings
+    const existingSettings = await getAppSettings();
     
     // Merge with new settings
-    const updatedSettings = { ...currentSettings, ...settings };
+    const updatedSettings = { ...existingSettings, ...settings };
     
-    // Save updated settings
-    await AsyncStorage.setItem(STORAGE_KEYS.APP_SETTINGS, JSON.stringify(updatedSettings));
+    await AsyncStorage.setItem(APP_SETTINGS_KEY, JSON.stringify(updatedSettings));
   } catch (error) {
     console.error('Error saving app settings:', error);
     throw error;
@@ -225,11 +220,16 @@ export const saveAppSettings = async (settings) => {
  */
 export const getAppSettings = async () => {
   try {
-    const jsonValue = await AsyncStorage.getItem(STORAGE_KEYS.APP_SETTINGS);
-    return jsonValue != null ? JSON.parse(jsonValue) : {};
+    const settingsString = await AsyncStorage.getItem(APP_SETTINGS_KEY);
+    return settingsString ? JSON.parse(settingsString) : {
+      darkMode: true,
+      notificationsEnabled: true,
+      stepTrackingEnabled: true,
+      unitSystem: 'metric'
+    };
   } catch (error) {
     console.error('Error getting app settings:', error);
-    return {};
+    throw error;
   }
 };
 
@@ -239,11 +239,16 @@ export const getAppSettings = async () => {
  */
 export const clearAllData = async () => {
   try {
-    const keys = await AsyncStorage.getAllKeys();
-    const nutritrackKeys = keys.filter(key => key.startsWith('nutritrack_'));
+    // Get all keys with our prefix
+    const allKeys = await AsyncStorage.getAllKeys();
+    const nutritrackKeys = allKeys.filter(key => 
+      key.startsWith('nutritrack_')
+    );
+    
+    // Clear all data
     await AsyncStorage.multiRemove(nutritrackKeys);
   } catch (error) {
-    console.error('Error clearing app data:', error);
+    console.error('Error clearing all data:', error);
     throw error;
   }
 };

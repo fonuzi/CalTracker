@@ -1,64 +1,71 @@
-import { DefaultTheme } from 'react-native-paper';
+import { DefaultTheme, DarkTheme } from 'react-native-paper';
 
-// Dark theme colors for the app
+// Dark theme colors
 export const darkTheme = {
-  ...DefaultTheme,
-  dark: true,
-  // Custom colors object for React Navigation
+  ...DarkTheme,
   colors: {
-    ...DefaultTheme.colors,
-    primary: '#6C63FF', // Main purple accent
-    accent: '#64DFDF', // Teal accent
-    background: '#121212', // Primary background
-    surface: '#1E1E1E', // Cards and surfaces
-    text: '#FFFFFF', // Regular text
-    secondaryText: '#B1B1B1', // Secondary text
-    disabled: '#757575', // Disabled elements
-    placeholder: '#9E9E9E', // Placeholder text
-    onSurface: '#FFFFFF', // Text on surface
-    notification: '#FF453A', // Notification badge
-    error: '#FF453A', // Error state
-    success: '#34C759', // Success state
-    warning: '#FCBF49', // Warning state
-    // Custom theme colors not in DefaultTheme
-    card: '#1E1E1E',
-    border: '#2C2C2C', 
-    protein: '#5E60CE', // Protein color 
-    carbs: '#64DFDF', // Carbs color
-    fat: '#FCBF49', // Fat color
-    dark: '#0D0D0D', // Extra dark for contrasts
-    header: '#1A1A1A', // Header background
-    drawerActiveBackground: 'rgba(108, 99, 255, 0.15)', // Active drawer item background
+    ...DarkTheme.colors,
+    primary: '#8B5CF6', // Vivid purple
+    accent: '#6366F1', // Indigo
+    background: '#111827', // Dark background
+    surface: '#1F2937', // Surface color for cards
+    text: '#F9FAFB', // Text color
+    secondaryText: '#9CA3AF', // Secondary text color
+    disabled: '#4B5563', // Disabled state color
+    placeholder: '#6B7280', // Placeholder text color
+    border: '#374151', // Border color
+    error: '#F87171', // Error color
+    success: '#34D399', // Success color
+    warning: '#FBBF24', // Warning color
+    info: '#60A5FA', // Info color
+    
+    // App-specific colors
+    protein: '#EC4899', // Pink
+    carbs: '#3B82F6', // Blue
+    fat: '#F59E0B', // Yellow/Orange
   },
+  // Custom fonts and spacing
+  spacing: {
+    xs: 4,
+    sm: 8,
+    md: 16,
+    lg: 24,
+    xl: 32,
+  },
+  roundness: 12,
 };
 
-// Light theme colors - kept for potential future toggle
+// Light theme colors
 export const lightTheme = {
   ...DefaultTheme,
-  dark: false,
   colors: {
     ...DefaultTheme.colors,
-    primary: '#6C63FF',
-    accent: '#64DFDF',
-    background: '#F5F5F5',
-    surface: '#FFFFFF',
-    text: '#000000',
-    secondaryText: '#6B6B6B',
-    disabled: '#BDBDBD',
-    placeholder: '#9E9E9E',
-    onSurface: '#000000',
-    notification: '#FF3B30',
-    error: '#FF3B30',
-    success: '#34C759',
-    warning: '#FF9500',
-    // Custom theme colors not in DefaultTheme
-    card: '#FFFFFF',
-    border: '#E0E0E0',
-    protein: '#5E60CE',
-    carbs: '#64DFDF',
-    fat: '#FCBF49',
-    dark: '#FFFFFF', 
-    header: '#F8F8F8',
-    drawerActiveBackground: 'rgba(108, 99, 255, 0.15)',
+    primary: '#8B5CF6', // Same purple as dark theme
+    accent: '#6366F1', // Indigo
+    background: '#F9FAFB', // Light background
+    surface: '#FFFFFF', // Surface color for cards
+    text: '#111827', // Text color
+    secondaryText: '#4B5563', // Secondary text color
+    disabled: '#D1D5DB', // Disabled state color
+    placeholder: '#9CA3AF', // Placeholder text color
+    border: '#E5E7EB', // Border color
+    error: '#EF4444', // Error color
+    success: '#10B981', // Success color
+    warning: '#F59E0B', // Warning color
+    info: '#3B82F6', // Info color
+    
+    // App-specific colors
+    protein: '#EC4899', // Pink
+    carbs: '#3B82F6', // Blue
+    fat: '#F59E0B', // Yellow/Orange
   },
+  // Custom fonts and spacing
+  spacing: {
+    xs: 4,
+    sm: 8,
+    md: 16,
+    lg: 24,
+    xl: 32,
+  },
+  roundness: 12,
 };

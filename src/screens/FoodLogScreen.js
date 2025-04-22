@@ -6,7 +6,8 @@ import {
   TouchableOpacity, 
   RefreshControl,
   Alert,
-  ActivityIndicator
+  ActivityIndicator,
+  ScrollView
 } from 'react-native';
 import { Text, Button, IconButton, Chip, useTheme } from 'react-native-paper';
 import { Feather } from '@expo/vector-icons';
