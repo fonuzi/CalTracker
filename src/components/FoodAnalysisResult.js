@@ -1,7 +1,17 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+  TextInput,
+  Switch,
+} from 'react-native';
 import { Icon } from '../assets/icons';
+import { getMealTypeIcon, getMealTypeColor } from '../assets/icons';
 import * as Animatable from 'react-native-animatable';
+import { suggestMealTypeByTime } from '../utils/foodAnalysis';
 
 /**
  * A component to display the results of food analysis from OpenAI
@@ -10,348 +20,650 @@ import * as Animatable from 'react-native-animatable';
  * @param {Function} onAdjust - Function to call when adjust button is pressed
  * @param {Function} onCancel - Function to call when cancel button is pressed
  */
-const FoodAnalysisResult = ({ 
-  foodData, 
-  onSave, 
-  onCancel, 
-  theme,
-  editable = true,
-}) => {
-  // State for editable values
-  const [editedFoodData, setEditedFoodData] = useState({
-    ...foodData,
-  });
+const FoodAnalysisResult = ({ foodData, onSave, onCancel, theme }) => {
+  // Local state for editing
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedData, setEditedData] = useState({ ...foodData });
+  const [selectedMealType, setSelectedMealType] = useState(
+    foodData.mealType || suggestMealTypeByTime()
+  );
   
-  // Function to handle changes to the food data
-  const handleChange = (field, value) => {
-    setEditedFoodData(prev => ({
-      ...prev,
-      [field]: value,
-    }));
+  // Meal type options
+  const mealTypes = [
+    { id: 'breakfast', label: 'Breakfast' },
+    { id: 'lunch', label: 'Lunch' },
+    { id: 'dinner', label: 'Dinner' },
+    { id: 'snack', label: 'Snack' },
+  ];
+  
+  // Format numbers with one decimal place if needed
+  const formatNumber = (num) => {
+    if (Number.isInteger(num)) {
+      return num.toString();
+    }
+    return num.toFixed(1);
   };
   
-  // Handle numeric input fields
-  const handleNumericChange = (field, value) => {
-    const numericValue = value.replace(/[^0-9.]/g, '');
-    handleChange(field, numericValue);
-  };
-  
-  // Function to handle save button press
+  // Handle save with current data
   const handleSave = () => {
-    // Convert string numeric values to actual numbers
-    const processedData = {
-      ...editedFoodData,
-      calories: parseFloat(editedFoodData.calories) || 0,
-      protein: parseFloat(editedFoodData.protein) || 0,
-      carbs: parseFloat(editedFoodData.carbs) || 0,
-      fat: parseFloat(editedFoodData.fat) || 0,
-      fiber: parseFloat(editedFoodData.fiber) || 0,
-      sugar: parseFloat(editedFoodData.sugar) || 0,
+    // Include selected meal type
+    const dataToSave = {
+      ...foodData,
+      mealType: selectedMealType,
     };
     
-    if (onSave) {
-      onSave(processedData);
+    onSave(dataToSave);
+  };
+  
+  // Handle save with edited data
+  const handleSaveEdited = () => {
+    // Include selected meal type
+    const dataToSave = {
+      ...editedData,
+      mealType: selectedMealType,
+    };
+    
+    onSave(dataToSave);
+  };
+  
+  // Toggle editing mode
+  const toggleEditing = () => {
+    setIsEditing(!isEditing);
+  };
+  
+  // Update edited data field
+  const updateField = (field, value) => {
+    setEditedData({
+      ...editedData,
+      [field]: value,
+    });
+  };
+  
+  // Update numerical field (with validation)
+  const updateNumericField = (field, value) => {
+    const parsedValue = parseFloat(value);
+    if (!isNaN(parsedValue) || value === '') {
+      updateField(field, value === '' ? 0 : parsedValue);
     }
   };
   
-  // Render nutritional values in a list
-  const renderNutritionList = () => {
-    const nutritionItems = [
-      { label: 'Calories', value: editedFoodData.calories, unit: 'cal', field: 'calories' },
-      { label: 'Protein', value: editedFoodData.protein, unit: 'g', field: 'protein' },
-      { label: 'Carbs', value: editedFoodData.carbs, unit: 'g', field: 'carbs' },
-      { label: 'Fat', value: editedFoodData.fat, unit: 'g', field: 'fat' },
-      { label: 'Fiber', value: editedFoodData.fiber, unit: 'g', field: 'fiber' },
-      { label: 'Sugar', value: editedFoodData.sugar, unit: 'g', field: 'sugar' },
-    ];
-    
-    return nutritionItems.map((item, index) => (
-      <View key={index} style={styles.nutritionItem}>
-        <Text style={[styles.nutritionLabel, { color: theme.colors.text }]}>
-          {item.label}
-        </Text>
-        <View style={styles.nutritionValueContainer}>
-          {editable ? (
-            <TextInput
-              style={[styles.nutritionInput, { color: theme.colors.text, borderColor: theme.colors.border }]}
-              value={item.value.toString()}
-              onChangeText={(text) => handleNumericChange(item.field, text)}
-              keyboardType="numeric"
-              selectTextOnFocus
-            />
-          ) : (
-            <Text style={[styles.nutritionValue, { color: theme.colors.text }]}>
-              {item.value}
-            </Text>
-          )}
-          <Text style={[styles.nutritionUnit, { color: theme.colors.secondaryText }]}>
-            {item.unit}
+  // Icon and color for selected meal type
+  const mealTypeIcon = getMealTypeIcon(selectedMealType);
+  const mealTypeColor = getMealTypeColor(selectedMealType);
+  
+  // Render the nutrition info section (non-editing mode)
+  const renderNutritionInfo = () => (
+    <View style={styles.nutritionContainer}>
+      <View style={styles.nutritionRow}>
+        <View style={styles.nutritionItem}>
+          <Text
+            style={[
+              styles.nutritionValue,
+              { color: theme.colors.text, fontSize: 28 },
+            ]}
+          >
+            {foodData.calories}
+          </Text>
+          <Text
+            style={[
+              styles.nutritionLabel,
+              { color: theme.colors.secondaryText },
+            ]}
+          >
+            Calories
           </Text>
         </View>
       </View>
-    ));
-  };
-  
-  // Render lists (ingredients, health benefits, concerns)
-  const renderList = (title, items) => {
-    if (!items || items.length === 0) return null;
-    
-    return (
-      <View style={styles.listContainer}>
-        <Text style={[styles.listTitle, { color: theme.colors.text }]}>{title}</Text>
-        {items.map((item, index) => (
-          <View key={index} style={styles.listItem}>
-            <Text style={[styles.listItemText, { color: theme.colors.secondaryText }]}>
-              • {item}
-            </Text>
-          </View>
-        ))}
+      
+      <View style={styles.nutritionRow}>
+        <View style={styles.nutritionItem}>
+          <Text style={[styles.nutritionValue, { color: theme.colors.text }]}>
+            {formatNumber(foodData.protein)}g
+          </Text>
+          <Text
+            style={[
+              styles.nutritionLabel,
+              { color: theme.colors.secondaryText },
+            ]}
+          >
+            Protein
+          </Text>
+        </View>
+        <View style={styles.nutritionItem}>
+          <Text style={[styles.nutritionValue, { color: theme.colors.text }]}>
+            {formatNumber(foodData.carbs)}g
+          </Text>
+          <Text
+            style={[
+              styles.nutritionLabel,
+              { color: theme.colors.secondaryText },
+            ]}
+          >
+            Carbs
+          </Text>
+        </View>
+        <View style={styles.nutritionItem}>
+          <Text style={[styles.nutritionValue, { color: theme.colors.text }]}>
+            {formatNumber(foodData.fat)}g
+          </Text>
+          <Text
+            style={[
+              styles.nutritionLabel,
+              { color: theme.colors.secondaryText },
+            ]}
+          >
+            Fat
+          </Text>
+        </View>
       </View>
-    );
-  };
+      
+      <View style={styles.nutritionRow}>
+        <View style={styles.nutritionItem}>
+          <Text style={[styles.nutritionValue, { color: theme.colors.text }]}>
+            {formatNumber(foodData.fiber || 0)}g
+          </Text>
+          <Text
+            style={[
+              styles.nutritionLabel,
+              { color: theme.colors.secondaryText },
+            ]}
+          >
+            Fiber
+          </Text>
+        </View>
+        <View style={styles.nutritionItem}>
+          <Text style={[styles.nutritionValue, { color: theme.colors.text }]}>
+            {formatNumber(foodData.sugar || 0)}g
+          </Text>
+          <Text
+            style={[
+              styles.nutritionLabel,
+              { color: theme.colors.secondaryText },
+            ]}
+          >
+            Sugar
+          </Text>
+        </View>
+        <View style={styles.nutritionItem}>
+          <Text style={[styles.nutritionValue, { color: theme.colors.text }]}>
+            {foodData.healthScore ? foodData.healthScore + '/10' : 'N/A'}
+          </Text>
+          <Text
+            style={[
+              styles.nutritionLabel,
+              { color: theme.colors.secondaryText },
+            ]}
+          >
+            Health
+          </Text>
+        </View>
+      </View>
+    </View>
+  );
+  
+  // Render editable nutrition fields
+  const renderEditableNutrition = () => (
+    <View style={styles.editableNutritionContainer}>
+      <View style={styles.editRow}>
+        <Text style={[styles.editLabel, { color: theme.colors.text }]}>
+          Name:
+        </Text>
+        <TextInput
+          style={[
+            styles.editInput,
+            {
+              color: theme.colors.text,
+              backgroundColor: theme.colors.surfaceHighlight,
+              borderColor: theme.colors.border,
+            },
+          ]}
+          value={editedData.name}
+          onChangeText={(text) => updateField('name', text)}
+          placeholder="Food name"
+          placeholderTextColor={theme.colors.placeholder}
+        />
+      </View>
+      
+      <View style={styles.editRow}>
+        <Text style={[styles.editLabel, { color: theme.colors.text }]}>
+          Calories:
+        </Text>
+        <TextInput
+          style={[
+            styles.editInput,
+            {
+              color: theme.colors.text,
+              backgroundColor: theme.colors.surfaceHighlight,
+              borderColor: theme.colors.border,
+            },
+          ]}
+          value={String(editedData.calories)}
+          onChangeText={(text) => updateNumericField('calories', text)}
+          keyboardType="numeric"
+          placeholder="Calories"
+          placeholderTextColor={theme.colors.placeholder}
+        />
+      </View>
+      
+      <View style={styles.editRow}>
+        <Text style={[styles.editLabel, { color: theme.colors.text }]}>
+          Protein (g):
+        </Text>
+        <TextInput
+          style={[
+            styles.editInput,
+            {
+              color: theme.colors.text,
+              backgroundColor: theme.colors.surfaceHighlight,
+              borderColor: theme.colors.border,
+            },
+          ]}
+          value={String(editedData.protein)}
+          onChangeText={(text) => updateNumericField('protein', text)}
+          keyboardType="numeric"
+          placeholder="Protein"
+          placeholderTextColor={theme.colors.placeholder}
+        />
+      </View>
+      
+      <View style={styles.editRow}>
+        <Text style={[styles.editLabel, { color: theme.colors.text }]}>
+          Carbs (g):
+        </Text>
+        <TextInput
+          style={[
+            styles.editInput,
+            {
+              color: theme.colors.text,
+              backgroundColor: theme.colors.surfaceHighlight,
+              borderColor: theme.colors.border,
+            },
+          ]}
+          value={String(editedData.carbs)}
+          onChangeText={(text) => updateNumericField('carbs', text)}
+          keyboardType="numeric"
+          placeholder="Carbs"
+          placeholderTextColor={theme.colors.placeholder}
+        />
+      </View>
+      
+      <View style={styles.editRow}>
+        <Text style={[styles.editLabel, { color: theme.colors.text }]}>
+          Fat (g):
+        </Text>
+        <TextInput
+          style={[
+            styles.editInput,
+            {
+              color: theme.colors.text,
+              backgroundColor: theme.colors.surfaceHighlight,
+              borderColor: theme.colors.border,
+            },
+          ]}
+          value={String(editedData.fat)}
+          onChangeText={(text) => updateNumericField('fat', text)}
+          keyboardType="numeric"
+          placeholder="Fat"
+          placeholderTextColor={theme.colors.placeholder}
+        />
+      </View>
+      
+      <View style={styles.editRow}>
+        <Text style={[styles.editLabel, { color: theme.colors.text }]}>
+          Fiber (g):
+        </Text>
+        <TextInput
+          style={[
+            styles.editInput,
+            {
+              color: theme.colors.text,
+              backgroundColor: theme.colors.surfaceHighlight,
+              borderColor: theme.colors.border,
+            },
+          ]}
+          value={String(editedData.fiber || 0)}
+          onChangeText={(text) => updateNumericField('fiber', text)}
+          keyboardType="numeric"
+          placeholder="Fiber"
+          placeholderTextColor={theme.colors.placeholder}
+        />
+      </View>
+      
+      <View style={styles.editRow}>
+        <Text style={[styles.editLabel, { color: theme.colors.text }]}>
+          Sugar (g):
+        </Text>
+        <TextInput
+          style={[
+            styles.editInput,
+            {
+              color: theme.colors.text,
+              backgroundColor: theme.colors.surfaceHighlight,
+              borderColor: theme.colors.border,
+            },
+          ]}
+          value={String(editedData.sugar || 0)}
+          onChangeText={(text) => updateNumericField('sugar', text)}
+          keyboardType="numeric"
+          placeholder="Sugar"
+          placeholderTextColor={theme.colors.placeholder}
+        />
+      </View>
+    </View>
+  );
   
   return (
-    <Animatable.View
-      animation="fadeInUp"
-      duration={500}
-      style={[styles.container, { backgroundColor: theme.colors.surface }]}
+    <ScrollView
+      style={[styles.container, { backgroundColor: theme.colors.background }]}
+      contentContainerStyle={styles.contentContainer}
     >
+      {/* Header */}
       <View style={styles.header}>
-        <View>
-          <Text style={[styles.title, { color: theme.colors.text }]}>
-            Food Analysis
-          </Text>
-          <Text style={[styles.subtitle, { color: theme.colors.secondaryText }]}>
-            Powered by AI
-          </Text>
-        </View>
-        <TouchableOpacity onPress={onCancel} hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}>
-          <Icon name="x" size={24} color={theme.colors.text} />
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={onCancel}
+        >
+          <Icon name="arrow-left" size={24} color={theme.colors.text} />
+        </TouchableOpacity>
+        <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
+          Food Analysis
+        </Text>
+        <TouchableOpacity style={styles.editButton} onPress={toggleEditing}>
+          <Icon
+            name={isEditing ? 'x' : 'edit-2'}
+            size={20}
+            color={theme.colors.primary}
+          />
         </TouchableOpacity>
       </View>
       
-      <ScrollView style={styles.scrollContainer}>
-        <View style={styles.foodInfoContainer}>
-          <Text style={[styles.foodInfoLabel, { color: theme.colors.secondaryText }]}>
-            Food Name
-          </Text>
-          {editable ? (
-            <TextInput
-              style={[styles.foodNameInput, { color: theme.colors.text, borderColor: theme.colors.border }]}
-              value={editedFoodData.name}
-              onChangeText={(text) => handleChange('name', text)}
-              placeholder="Enter food name"
-              placeholderTextColor={theme.colors.placeholder}
-            />
-          ) : (
-            <Text style={[styles.foodName, { color: theme.colors.text }]}>
-              {editedFoodData.name}
-            </Text>
-          )}
-        </View>
-        
-        <View style={styles.foodInfoContainer}>
-          <Text style={[styles.foodInfoLabel, { color: theme.colors.secondaryText }]}>
-            Serving Size
-          </Text>
-          {editable ? (
-            <TextInput
-              style={[styles.servingSizeInput, { color: theme.colors.text, borderColor: theme.colors.border }]}
-              value={editedFoodData.serving_size}
-              onChangeText={(text) => handleChange('serving_size', text)}
-              placeholder="Enter serving size"
-              placeholderTextColor={theme.colors.placeholder}
-            />
-          ) : (
-            <Text style={[styles.servingSize, { color: theme.colors.text }]}>
-              {editedFoodData.serving_size}
-            </Text>
-          )}
-        </View>
-        
-        <View style={styles.divider} />
-        
-        <View style={styles.nutritionContainer}>
-          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-            Nutrition Facts
-          </Text>
-          {renderNutritionList()}
-        </View>
-        
-        <View style={styles.divider} />
-        
-        {renderList('Ingredients', editedFoodData.ingredients)}
-        
-        {editedFoodData.ingredients && editedFoodData.ingredients.length > 0 && (
-          <View style={styles.divider} />
-        )}
-        
-        {renderList('Health Benefits', editedFoodData.health_benefits)}
-        
-        {editedFoodData.health_benefits && editedFoodData.health_benefits.length > 0 && (
-          <View style={styles.divider} />
-        )}
-        
-        {renderList('Potential Concerns', editedFoodData.concerns)}
-      </ScrollView>
+      {/* Food Name */}
+      <Animatable.View animation="fadeIn" duration={600}>
+        <Text style={[styles.foodName, { color: theme.colors.text }]}>
+          {isEditing ? editedData.name : foodData.name}
+        </Text>
+      </Animatable.View>
       
-      <View style={styles.buttonContainer}>
-        {editable && (
-          <TouchableOpacity
-            style={[styles.button, styles.saveButton, { backgroundColor: theme.colors.primary }]}
-            onPress={handleSave}
+      {/* Nutrition Info */}
+      <Animatable.View animation="fadeIn" duration={600} delay={100}>
+        {isEditing ? renderEditableNutrition() : renderNutritionInfo()}
+      </Animatable.View>
+      
+      {/* Description */}
+      {!isEditing && foodData.description && (
+        <Animatable.View animation="fadeIn" duration={600} delay={200}>
+          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+            Description
+          </Text>
+          <Text
+            style={[
+              styles.descriptionText,
+              { color: theme.colors.secondaryText },
+            ]}
           >
-            <Text style={styles.buttonText}>Save</Text>
-          </TouchableOpacity>
-        )}
+            {foodData.description}
+          </Text>
+        </Animatable.View>
+      )}
+      
+      {/* Health Tips */}
+      {!isEditing && foodData.tips && (
+        <Animatable.View animation="fadeIn" duration={600} delay={300}>
+          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+            Health Tips
+          </Text>
+          <View
+            style={[
+              styles.tipsContainer,
+              { backgroundColor: theme.colors.surface },
+            ]}
+          >
+            <Icon
+              name="info"
+              size={20}
+              color={theme.colors.primary}
+              style={styles.tipsIcon}
+            />
+            <Text
+              style={[styles.tipsText, { color: theme.colors.secondaryText }]}
+            >
+              {foodData.tips}
+            </Text>
+          </View>
+        </Animatable.View>
+      )}
+      
+      {/* Meal Type Selection */}
+      <Animatable.View animation="fadeIn" duration={600} delay={400}>
+        <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+          Meal Type
+        </Text>
+        <View style={styles.mealTypeContainer}>
+          {mealTypes.map((type) => (
+            <TouchableOpacity
+              key={type.id}
+              style={[
+                styles.mealTypeButton,
+                {
+                  backgroundColor:
+                    selectedMealType === type.id
+                      ? getMealTypeColor(type.id) + '20'
+                      : theme.colors.surface,
+                  borderColor:
+                    selectedMealType === type.id
+                      ? getMealTypeColor(type.id)
+                      : theme.colors.border,
+                },
+              ]}
+              onPress={() => setSelectedMealType(type.id)}
+            >
+              <Icon
+                name={getMealTypeIcon(type.id)}
+                size={18}
+                color={
+                  selectedMealType === type.id
+                    ? getMealTypeColor(type.id)
+                    : theme.colors.text
+                }
+                style={styles.mealTypeIcon}
+              />
+              <Text
+                style={[
+                  styles.mealTypeText,
+                  {
+                    color:
+                      selectedMealType === type.id
+                        ? getMealTypeColor(type.id)
+                        : theme.colors.text,
+                  },
+                ]}
+              >
+                {type.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </Animatable.View>
+      
+      {/* Action Buttons */}
+      <Animatable.View animation="fadeIn" duration={600} delay={500}>
+        <TouchableOpacity
+          style={[
+            styles.saveButton,
+            { backgroundColor: theme.colors.primary },
+          ]}
+          onPress={isEditing ? handleSaveEdited : handleSave}
+        >
+          <Icon name="check" size={20} color="#FFFFFF" style={styles.saveButtonIcon} />
+          <Text style={styles.saveButtonText}>
+            {isEditing ? 'Save Changes' : 'Add to Food Log'}
+          </Text>
+        </TouchableOpacity>
         
         <TouchableOpacity
-          style={[styles.button, styles.cancelButton, { borderColor: theme.colors.border }]}
+          style={[
+            styles.cancelButton,
+            {
+              backgroundColor: theme.colors.surface,
+              borderColor: theme.colors.border,
+            },
+          ]}
           onPress={onCancel}
         >
           <Text style={[styles.cancelButtonText, { color: theme.colors.text }]}>
             Cancel
           </Text>
         </TouchableOpacity>
-      </View>
-    </Animatable.View>
+      </Animatable.View>
+    </ScrollView>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+  },
+  contentContainer: {
     padding: 20,
+    paddingBottom: 40,
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 20,
   },
-  title: {
-    fontSize: 20,
-    fontWeight: '700',
+  backButton: {
+    padding: 8,
   },
-  subtitle: {
-    fontSize: 14,
-  },
-  scrollContainer: {
+  headerTitle: {
     flex: 1,
+    fontSize: 20,
+    fontWeight: 'bold',
+    textAlign: 'center',
   },
-  foodInfoContainer: {
-    marginBottom: 15,
-  },
-  foodInfoLabel: {
-    fontSize: 14,
-    marginBottom: 5,
-  },
-  foodNameInput: {
-    fontSize: 18,
-    fontWeight: '600',
-    borderWidth: 1,
-    borderRadius: 8,
-    padding: 10,
+  editButton: {
+    padding: 8,
   },
   foodName: {
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  servingSizeInput: {
-    fontSize: 16,
-    borderWidth: 1,
-    borderRadius: 8,
-    padding: 10,
-  },
-  servingSize: {
-    fontSize: 16,
-  },
-  divider: {
-    height: 1,
-    backgroundColor: '#333333',
-    marginVertical: 15,
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 20,
   },
   nutritionContainer: {
-    marginBottom: 15,
+    marginBottom: 24,
+  },
+  nutritionRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 16,
+  },
+  nutritionItem: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  nutritionValue: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  nutritionLabel: {
+    fontSize: 14,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: '600',
     marginBottom: 10,
+    marginTop: 10,
   },
-  nutritionItem: {
+  descriptionText: {
+    fontSize: 16,
+    lineHeight: 24,
+    marginBottom: 20,
+  },
+  tipsContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  nutritionLabel: {
-    fontSize: 16,
-  },
-  nutritionValueContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  nutritionInput: {
-    fontSize: 16,
-    fontWeight: '600',
-    borderWidth: 1,
-    borderRadius: 8,
-    padding: 8,
-    width: 60,
-    textAlign: 'center',
-  },
-  nutritionValue: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  nutritionUnit: {
-    fontSize: 14,
-    marginLeft: 4,
-  },
-  listContainer: {
-    marginBottom: 15,
-  },
-  listTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginBottom: 10,
-  },
-  listItem: {
-    marginBottom: 5,
-  },
-  listItemText: {
-    fontSize: 16,
-    lineHeight: 22,
-  },
-  buttonContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 20,
-  },
-  button: {
-    flex: 1,
     borderRadius: 12,
-    padding: 15,
+    padding: 16,
+    marginBottom: 24,
+  },
+  tipsIcon: {
+    marginRight: 12,
+    marginTop: 2,
+  },
+  tipsText: {
+    flex: 1,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  mealTypeContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    marginBottom: 30,
+  },
+  mealTypeButton: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    minWidth: '48%',
+    marginBottom: 10,
+  },
+  mealTypeIcon: {
+    marginRight: 8,
+  },
+  mealTypeText: {
+    fontSize: 14,
+    fontWeight: '500',
   },
   saveButton: {
-    marginRight: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 12,
   },
-  cancelButton: {
-    borderWidth: 1,
+  saveButtonIcon: {
+    marginRight: 8,
   },
-  buttonText: {
+  saveButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
   },
+  cancelButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
   cancelButtonText: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '500',
+  },
+  editableNutritionContainer: {
+    marginBottom: 24,
+  },
+  editRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  editLabel: {
+    width: 100,
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  editInput: {
+    flex: 1,
+    height: 40,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
   },
 });
 

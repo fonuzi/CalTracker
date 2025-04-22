@@ -2,64 +2,64 @@
  * Color definitions for the app's themes
  */
 
-export const darkTheme = {
-  name: 'dark',
+// Light theme
+export const lightTheme = {
+  mode: 'light',
   colors: {
     // Base colors
-    primary: '#8E7CFF',  // Purple
-    secondary: '#4ECDC4', // Teal
-    accent: '#FF6B6B',   // Coral
-    
-    // Background colors
-    background: '#121212', // Main background
-    surface: '#1E1E1E',   // Cards, modals
-    surfaceHighlight: '#2A2A2A', // Highlighted surface
+    primary: '#34C759', // Green
+    secondary: '#5AC8FA', // Blue
+    background: '#F9F9F9', // Light gray
+    surface: '#FFFFFF', // White
+    surfaceHighlight: '#F2F2F7', // Light gray for input fields
     
     // Text colors
-    text: '#FFFFFF',     // Primary text
-    secondaryText: '#BBBBBB', // Secondary text
-    tertiaryText: '#888888', // Less important text
-    placeholder: '#777777', // Placeholder text
+    text: '#000000', // Black
+    secondaryText: '#555555', // Dark gray
+    placeholder: '#999999', // Gray
     
-    // Utility colors
-    success: '#06D6A0',  // Success states
-    warning: '#FFD166',  // Warning states
-    error: '#FF6B6B',    // Error states
-    caution: '#FF9F43',  // Caution states
+    // Status colors
+    success: '#34C759', // Green
+    warning: '#FF9500', // Orange
+    error: '#FF3B30', // Red
     
-    // Border colors
-    border: '#333333',   // Borders
-    divider: '#2A2A2A',  // Divider lines
+    // Border and divider colors
+    border: '#E0E0E0', // Light gray
+    
+    // Nutrient colors
+    protein: '#5856D6', // Purple
+    carbs: '#FF9500', // Orange
+    fat: '#FF3B30', // Red
   },
 };
 
-export const lightTheme = {
-  name: 'light',
+// Dark theme
+export const darkTheme = {
+  mode: 'dark',
   colors: {
     // Base colors
-    primary: '#6A5AE0',  // Purple
-    secondary: '#2EB4AD', // Teal
-    accent: '#E74C4C',   // Coral
-    
-    // Background colors
-    background: '#F7F7F7', // Main background
-    surface: '#FFFFFF',   // Cards, modals
-    surfaceHighlight: '#F0F0F0', // Highlighted surface
+    primary: '#34C759', // Green
+    secondary: '#5AC8FA', // Blue
+    background: '#121212', // Dark gray
+    surface: '#1E1E1E', // Slightly lighter dark gray
+    surfaceHighlight: '#2C2C2E', // Light gray for input fields
     
     // Text colors
-    text: '#212121',     // Primary text
-    secondaryText: '#757575', // Secondary text
-    tertiaryText: '#9E9E9E', // Less important text
-    placeholder: '#BDBDBD', // Placeholder text
+    text: '#FFFFFF', // White
+    secondaryText: '#AAAAAA', // Light gray
+    placeholder: '#777777', // Gray
     
-    // Utility colors
-    success: '#00BFA5',  // Success states
-    warning: '#FFC107',  // Warning states
-    error: '#F44336',    // Error states
-    caution: '#FF9800',  // Caution states
+    // Status colors
+    success: '#34C759', // Green
+    warning: '#FF9500', // Orange
+    error: '#FF3B30', // Red
     
-    // Border colors
-    border: '#E0E0E0',   // Borders
-    divider: '#EEEEEE',  // Divider lines
+    // Border and divider colors
+    border: '#333333', // Dark gray
+    
+    // Nutrient colors
+    protein: '#5E5CE6', // Purple
+    carbs: '#FF9F0A', // Orange
+    fat: '#FF453A', // Red
   },
 };

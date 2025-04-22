@@ -10,19 +10,32 @@ import { getMealTypeIcon, getMealTypeColor } from '../assets/icons';
  * @param {Function} onDelete - Function to call when delete button is pressed
  */
 const FoodItem = ({ food, onPress, onDelete, theme }) => {
-  // Format time from timestamp (e.g., "8:30 AM")
-  const formatTime = (timestamp) => {
-    const date = new Date(timestamp);
-    return date.toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-    });
+  // Format time from ISO string or timestamp
+  const formatTime = () => {
+    if (!food.timestamp) return '';
+    
+    const date = new Date(food.timestamp);
+    let hours = date.getHours();
+    const minutes = date.getMinutes();
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    
+    hours = hours % 12;
+    hours = hours ? hours : 12; // the hour '0' should be '12'
+    
+    const formattedMinutes = minutes < 10 ? `0${minutes}` : minutes;
+    
+    return `${hours}:${formattedMinutes} ${ampm}`;
   };
   
   // Get icon and color for meal type
   const mealTypeIcon = getMealTypeIcon(food.mealType);
   const mealTypeColor = getMealTypeColor(food.mealType);
+  
+  // Capitalize first letter of meal type
+  const formatMealType = (mealType) => {
+    if (!mealType) return '';
+    return mealType.charAt(0).toUpperCase() + mealType.slice(1);
+  };
   
   return (
     <TouchableOpacity
@@ -30,40 +43,59 @@ const FoodItem = ({ food, onPress, onDelete, theme }) => {
       onPress={() => onPress(food)}
       activeOpacity={0.7}
     >
-      {/* Left icon for meal type */}
+      {/* Meal type indicator */}
       <View
         style={[
-          styles.iconContainer,
-          { backgroundColor: mealTypeColor + '20' }, // 20% opacity
+          styles.mealTypeIndicator,
+          { backgroundColor: mealTypeColor },
         ]}
       >
-        <Icon name={mealTypeIcon} size={18} color={mealTypeColor} />
+        <Icon name={mealTypeIcon} size={20} color="#FFFFFF" />
       </View>
       
       {/* Food info */}
-      <View style={styles.infoContainer}>
+      <View style={styles.foodInfo}>
         <Text style={[styles.foodName, { color: theme.colors.text }]}>
           {food.name}
         </Text>
-        <Text style={[styles.foodDetails, { color: theme.colors.secondaryText }]}>
-          {food.calories} cal • P: {Math.round(food.protein)}g • C: {Math.round(food.carbs)}g • F: {Math.round(food.fat)}g
+        
+        <View style={styles.foodDetails}>
+          <Text
+            style={[styles.mealTypeText, { color: mealTypeColor }]}
+          >
+            {formatMealType(food.mealType)}
+          </Text>
+          <Text
+            style={[styles.timeText, { color: theme.colors.secondaryText }]}
+          >
+            {formatTime()}
+          </Text>
+        </View>
+      </View>
+      
+      {/* Nutrition summary */}
+      <View style={styles.nutritionSummary}>
+        <Text style={[styles.calorieText, { color: theme.colors.text }]}>
+          {Math.round(food.calories)}
+        </Text>
+        <Text
+          style={[
+            styles.calorieLabel,
+            { color: theme.colors.secondaryText },
+          ]}
+        >
+          cal
         </Text>
       </View>
       
-      {/* Right section with time and delete button */}
-      <View style={styles.rightContainer}>
-        <Text style={[styles.timeText, { color: theme.colors.secondaryText }]}>
-          {formatTime(food.timestamp)}
-        </Text>
-        
-        <TouchableOpacity
-          style={styles.deleteButton}
-          onPress={() => onDelete(food)}
-          hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
-        >
-          <Icon name="trash-2" size={16} color={theme.colors.error} />
-        </TouchableOpacity>
-      </View>
+      {/* Delete button */}
+      <TouchableOpacity
+        style={styles.deleteButton}
+        onPress={() => onDelete(food)}
+        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+      >
+        <Icon name="trash-2" size={18} color={theme.colors.error} />
+      </TouchableOpacity>
     </TouchableOpacity>
   );
 };
@@ -71,39 +103,52 @@ const FoodItem = ({ food, onPress, onDelete, theme }) => {
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 10,
     alignItems: 'center',
+    borderRadius: 12,
+    marginBottom: 12,
+    padding: 14,
   },
-  iconContainer: {
+  mealTypeIndicator: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    justifyContent: 'center',
+    marginRight: 14,
   },
-  infoContainer: {
+  foodInfo: {
     flex: 1,
   },
   foodName: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '500',
     marginBottom: 4,
   },
   foodDetails: {
-    fontSize: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
-  rightContainer: {
-    alignItems: 'flex-end',
+  mealTypeText: {
+    fontSize: 13,
+    fontWeight: '500',
+    marginRight: 8,
   },
   timeText: {
+    fontSize: 13,
+  },
+  nutritionSummary: {
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  calorieText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  calorieLabel: {
     fontSize: 12,
-    marginBottom: 6,
   },
   deleteButton: {
-    padding: 4,
+    padding: 5,
   },
 });
 

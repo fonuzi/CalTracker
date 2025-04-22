@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { calculateRemainingCalories } from '../utils/foodAnalysis';
+import { CircularProgress } from 'react-native-circular-progress';
+import * as Animatable from 'react-native-animatable';
 
 /**
  * A component to display the user's daily calorie progress
@@ -8,84 +9,76 @@ import { calculateRemainingCalories } from '../utils/foodAnalysis';
  * @param {number} goal - Calorie goal for the day
  * @param {Object} theme - Current theme
  */
-const CalorieProgress = ({ consumed, goal, theme }) => {
-  // Calculate percentage for progress bar
+const CalorieProgress = ({ consumed = 0, goal = 2000, theme }) => {
+  // Calculate percentage of goal consumed (capped at 100%)
   const percentage = Math.min(100, Math.round((consumed / goal) * 100));
   
-  // Calculate calories remaining
-  const remaining = calculateRemainingCalories(goal, consumed);
+  // Determine remaining calories
+  const remaining = Math.max(0, goal - consumed);
   
-  // Determine color based on percentage
-  const getProgressColor = () => {
+  // Get color based on percentage
+  const getColor = () => {
     if (percentage < 50) {
       return theme.colors.success;
-    } else if (percentage < 80) {
+    } else if (percentage < 85) {
       return theme.colors.warning;
-    } else if (percentage < 100) {
-      return theme.colors.caution;
     } else {
       return theme.colors.error;
     }
   };
   
-  // Format numbers with commas
-  const formatNumber = (num) => {
-    return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-  };
-  
   return (
-    <View style={[styles.container, { backgroundColor: theme.colors.surface }]}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={[styles.title, { color: theme.colors.text }]}>Calorie Budget</Text>
-        <Text style={[styles.value, { color: theme.colors.text }]}>
-          {formatNumber(consumed)} / {formatNumber(goal)}
-        </Text>
+    <Animatable.View 
+      animation="fadeIn" 
+      duration={1000} 
+      style={[styles.container, { backgroundColor: theme.colors.surface }]}
+    >
+      <View style={styles.progressContainer}>
+        <CircularProgress
+          size={180}
+          width={15}
+          fill={percentage}
+          tintColor={getColor()}
+          backgroundColor={theme.colors.border}
+          rotation={0}
+          lineCap="round"
+          backgroundWidth={5}
+        >
+          {() => (
+            <View style={styles.innerContent}>
+              <Text style={[styles.calorieCount, { color: theme.colors.text }]}>
+                {consumed}
+              </Text>
+              <Text style={[styles.calorieLabel, { color: theme.colors.secondaryText }]}>
+                calories consumed
+              </Text>
+            </View>
+          )}
+        </CircularProgress>
       </View>
       
-      {/* Progress bar */}
-      <View style={[styles.progressBar, { backgroundColor: theme.colors.border }]}>
-        <View
-          style={[
-            styles.progressFill,
-            {
-              width: `${percentage}%`,
-              backgroundColor: getProgressColor(),
-            },
-          ]}
-        />
-      </View>
-      
-      {/* Info row */}
-      <View style={styles.infoRow}>
-        <View style={styles.infoItem}>
-          <Text style={[styles.infoValue, { color: theme.colors.text }]}>
-            {formatNumber(consumed)}
+      <View style={styles.statsContainer}>
+        <View style={styles.statItem}>
+          <Text style={[styles.statValue, { color: theme.colors.text }]}>
+            {goal}
           </Text>
-          <Text style={[styles.infoLabel, { color: theme.colors.secondaryText }]}>
-            Consumed
+          <Text style={[styles.statLabel, { color: theme.colors.secondaryText }]}>
+            Daily Goal
           </Text>
         </View>
         
-        <View style={styles.infoItem}>
-          <Text style={[styles.infoValue, { color: theme.colors.text }]}>
-            {formatNumber(remaining)}
+        <View style={styles.divider} />
+        
+        <View style={styles.statItem}>
+          <Text style={[styles.statValue, { color: theme.colors.text }]}>
+            {remaining}
           </Text>
-          <Text style={[styles.infoLabel, { color: theme.colors.secondaryText }]}>
+          <Text style={[styles.statLabel, { color: theme.colors.secondaryText }]}>
             Remaining
           </Text>
         </View>
-        
-        <View style={styles.infoItem}>
-          <Text style={[styles.infoValue, { color: theme.colors.text }]}>
-            {formatNumber(goal)}
-          </Text>
-          <Text style={[styles.infoLabel, { color: theme.colors.secondaryText }]}>
-            Goal
-          </Text>
-        </View>
       </View>
-    </View>
+    </Animatable.View>
   );
 };
 
@@ -93,47 +86,53 @@ const styles = StyleSheet.create({
   container: {
     borderRadius: 16,
     padding: 16,
-    marginVertical: 8,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+    margin: 16,
     alignItems: 'center',
-    marginBottom: 12,
   },
-  title: {
-    fontSize: 18,
+  progressContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+  },
+  innerContent: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  calorieCount: {
+    fontSize: 36,
     fontWeight: 'bold',
   },
-  value: {
-    fontSize: 16,
-    fontWeight: '600',
+  calorieLabel: {
+    fontSize: 14,
+    textAlign: 'center',
+    marginTop: 5,
   },
-  progressBar: {
-    height: 12,
-    borderRadius: 6,
-    marginBottom: 16,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: 6,
-  },
-  infoRow: {
+  statsContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'space-around',
+    width: '100%',
+    marginTop: 10,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0, 0, 0, 0.1)',
   },
-  infoItem: {
+  statItem: {
     alignItems: 'center',
+    justifyContent: 'center',
     flex: 1,
   },
-  infoValue: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 4,
+  statValue: {
+    fontSize: 24,
+    fontWeight: 'bold',
   },
-  infoLabel: {
-    fontSize: 12,
+  statLabel: {
+    fontSize: 14,
+    marginTop: 4,
+  },
+  divider: {
+    width: 1,
+    height: '80%',
+    backgroundColor: 'rgba(0, 0, 0, 0.1)',
   },
 });
 
