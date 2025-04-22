@@ -407,6 +407,7 @@ const CameraScreen = ({ navigation }) => {
             onSave={saveFood}
             onAdjust={() => {/* TODO: Implement food adjustment */}}
             onCancel={cancelAnalysis}
+            theme={theme}
           />
         </View>
       </View>

@@ -1,4 +1,5 @@
 import * as FileSystem from 'expo-file-system';
+import { Platform } from 'react-native';
 
 // Check if OpenAI API key is available
 const hasOpenAIKey = process.env.OPENAI_API_KEY || false;
@@ -32,11 +33,23 @@ export const analyzeFoodImage = async (imageUri) => {
   }
   
   try {
-    // Read the image file as base64
-    const base64Image = await FileSystem.readAsStringAsync(imageUri, {
-      encoding: FileSystem.EncodingType.Base64,
-      quality: 0.6, // Reduce quality to optimize for API requests
-    });
+    // Check if we're on web platform - handle web differently
+    const isWeb = Platform.OS === 'web';
+    let base64Image;
+    
+    if (isWeb) {
+      // In web, we can't access the file system the same way
+      // We might not have a proper base64 image in the web environment
+      console.log('Web environment detected, using text analysis as fallback');
+      // Return demo data for now as web doesn't support this well
+      return getDemoFoodData('image');
+    } else {
+      // Native platforms can read the file directly
+      base64Image = await FileSystem.readAsStringAsync(imageUri, {
+        encoding: FileSystem.EncodingType.Base64,
+        quality: 0.6, // Reduce quality to optimize for API requests
+      });
+    }
     
     // Log image size for debugging
     console.log(`Image size: ${Math.round(base64Image.length / 1024)} KB`);
@@ -260,7 +273,13 @@ const getDemoFoodData = (method, text = '') => {
   
   // If text method, try to extract food name from text
   if (method === 'text' && text) {
-    foodName = text.length > 30 ? text.substring(0, 30) : text;
+    foodName = text.length > 30 ? text.substring(0, 30) + '...' : text;
+  }
+  
+  // Check if we're on web platform and let the user know why we're using demo data
+  const isWeb = Platform.OS === 'web';
+  if (isWeb && method === 'image') {
+    console.log('Note: Web environments have limited support for image analysis. Use a mobile device for full functionality.');
   }
   
   return {
