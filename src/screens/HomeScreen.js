@@ -73,6 +73,11 @@ const HomeScreen = ({ navigation, theme }) => {
     navigation.navigate('Add Food');
   };
   
+  // Function to handle taking a photo of food
+  const handleTakePhoto = () => {
+    navigation.navigate('Add Food');
+  };
+  
   // Default calorie goal if user profile doesn't have one
   const calorieGoal = userProfile?.calorieGoal || 2000;
   
@@ -159,6 +164,25 @@ const HomeScreen = ({ navigation, theme }) => {
         theme={theme} 
       />
       
+      {/* Quick action buttons */}
+      <View style={styles.actionButtonsContainer}>
+        <TouchableOpacity
+          style={[styles.actionButton, { backgroundColor: theme.colors.primary }]}
+          onPress={handleTakePhoto}
+        >
+          <Icon name="camera" size={20} color="#FFFFFF" style={styles.actionButtonIcon} />
+          <Text style={styles.actionButtonText}>Take Photo of Food</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity
+          style={[styles.actionButton, { backgroundColor: theme.colors.surface, borderColor: theme.colors.primary, borderWidth: 1 }]}
+          onPress={handleAddFood}
+        >
+          <Icon name="edit" size={20} color={theme.colors.primary} style={styles.actionButtonIcon} />
+          <Text style={[styles.actionButtonText, { color: theme.colors.primary }]}>Add Manually</Text>
+        </TouchableOpacity>
+      </View>
+      
       {/* Recent meals section - could be expanded in future */}
       <View style={styles.recentMealsSection}>
         <View style={styles.sectionHeader}>
@@ -178,7 +202,7 @@ const HomeScreen = ({ navigation, theme }) => {
           </Text>
         ) : (
           <Text style={{ color: theme.colors.secondaryText }}>
-            No meals logged today. Tap the + button to add a meal.
+            No meals logged today. Use the buttons above to add a meal.
           </Text>
         )}
       </View>
@@ -225,6 +249,31 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     marginBottom: 10,
+  },
+  actionButtonsContainer: {
+    marginBottom: 20,
+    flexDirection: 'column',
+    gap: 10,
+  },
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 15,
+    borderRadius: 12,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  actionButtonIcon: {
+    marginRight: 10,
+  },
+  actionButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
   recentMealsSection: {
     marginBottom: 20,

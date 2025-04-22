@@ -14,6 +14,7 @@ import {
 import { Text, useTheme, Button } from 'react-native-paper';
 import { Camera } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system';
 import { Feather } from '@expo/vector-icons';
 import * as Animatable from 'react-native-animatable';
 

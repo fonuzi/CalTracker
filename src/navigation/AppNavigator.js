@@ -41,25 +41,26 @@ const TabNavigator = ({ theme }) => {
     >
       <Tab.Screen
         name="Home"
-        component={HomeScreen}
         options={{
           tabBarIcon: ({ color, size }) => (
             <Icon name="home" size={size} color={color} />
           ),
         }}
-      />
+      >
+        {props => <HomeScreen {...props} theme={theme} />}
+      </Tab.Screen>
       <Tab.Screen
         name="Food Log"
-        component={FoodLogScreen}
         options={{
           tabBarIcon: ({ color, size }) => (
             <Icon name="book" size={size} color={color} />
           ),
         }}
-      />
+      >
+        {props => <FoodLogScreen {...props} theme={theme} />}
+      </Tab.Screen>
       <Tab.Screen
         name="Add Food"
-        component={CameraScreen}
         options={{
           tabBarIcon: ({ color, size }) => (
             <Icon name="camera" size={size} color={color} />
@@ -67,25 +68,29 @@ const TabNavigator = ({ theme }) => {
           headerShown: false,
           tabBarLabel: 'Add Food',
         }}
-      />
+      >
+        {props => <CameraScreen {...props} theme={theme} />}
+      </Tab.Screen>
       <Tab.Screen
         name="Activity"
-        component={StepTrackingScreen}
         options={{
           tabBarIcon: ({ color, size }) => (
             <Icon name="activity" size={size} color={color} />
           ),
         }}
-      />
+      >
+        {props => <StepTrackingScreen {...props} theme={theme} />}
+      </Tab.Screen>
       <Tab.Screen
         name="Profile"
-        component={ProfileScreen}
         options={{
           tabBarIcon: ({ color, size }) => (
             <Icon name="user" size={size} color={color} />
           ),
         }}
-      />
+      >
+        {props => <ProfileScreen {...props} theme={theme} />}
+      </Tab.Screen>
     </Tab.Navigator>
   );
 };
@@ -114,9 +119,10 @@ const AppNavigator = ({ theme }) => {
           // Onboarding flow
           <Stack.Screen
             name="Onboarding"
-            component={OnboardingScreen}
             options={{ headerShown: false }}
-          />
+          >
+            {props => <OnboardingScreen {...props} theme={theme} />}
+          </Stack.Screen>
         ) : (
           // Main app flow
           <>
@@ -128,8 +134,10 @@ const AppNavigator = ({ theme }) => {
             </Stack.Screen>
             <Stack.Screen
               name="Settings"
-              component={SettingsScreen}
-            />
+              options={{ headerTitle: "Settings" }}
+            >
+              {props => <SettingsScreen {...props} theme={theme} />}
+            </Stack.Screen>
           </>
         )}
       </Stack.Navigator>
