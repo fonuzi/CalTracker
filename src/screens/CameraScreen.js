@@ -51,14 +51,64 @@ const CameraScreen = ({ navigation }) => {
     })();
   }, []);
   
+  // Function to optimize image for API request
+  const optimizeImage = async (uri) => {
+    try {
+      // Get file info to check size
+      const fileInfo = await FileSystem.getInfoAsync(uri);
+      console.log(`Original image size: ${Math.round(fileInfo.size / 1024)} KB`);
+      
+      // If image is already small enough, return the original URI
+      if (fileInfo.size < 1000000) { // Less than 1MB
+        return uri;
+      }
+      
+      // Calculate target size based on original size to maintain reasonable quality
+      let targetQuality = 0.7;
+      if (fileInfo.size > 5000000) { // > 5MB
+        targetQuality = 0.4;
+      } else if (fileInfo.size > 2000000) { // > 2MB
+        targetQuality = 0.5;
+      }
+      
+      // Create a new filename for the compressed image
+      const newUri = FileSystem.documentDirectory + 
+        `compressed_${Date.now()}.jpg`;
+      
+      // Compress/resize the image using FileSystem API
+      await FileSystem.copyAsync({
+        from: uri,
+        to: newUri,
+        copyOptions: {
+          quality: targetQuality
+        }
+      });
+      
+      // Verify the new file size
+      const newFileInfo = await FileSystem.getInfoAsync(newUri);
+      console.log(`Optimized image size: ${Math.round(newFileInfo.size / 1024)} KB`);
+      
+      return newUri;
+    } catch (error) {
+      console.error('Error optimizing image:', error);
+      // Return original URI if optimization fails
+      return uri;
+    }
+  };
+
   // Function to handle taking a picture
   const takePicture = async () => {
     if (cameraRef.current) {
       try {
-        const photo = await cameraRef.current.takePictureAsync({ quality: 0.7 });
-        // Use the photo directly without manipulation for now
+        const photo = await cameraRef.current.takePictureAsync({ 
+          quality: 0.8, 
+          exif: false // Don't include EXIF data to reduce size
+        });
         setCapturedImage(photo.uri);
-        analyzeImage(photo.uri);
+        
+        // Optimize the image before sending for analysis
+        const optimizedUri = await optimizeImage(photo.uri);
+        analyzeImage(optimizedUri);
       } catch (error) {
         console.error('Error taking picture:', error);
         Alert.alert('Error', 'Failed to take picture. Please try again.');
@@ -73,14 +123,17 @@ const CameraScreen = ({ navigation }) => {
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [4, 3],
-        quality: 0.7,
+        quality: 0.8,
+        allowsMultipleSelection: false,
       });
       
       if (!result.canceled && result.assets && result.assets.length > 0) {
         const selectedImage = result.assets[0];
-        // Use the selected image directly without manipulation for now
         setCapturedImage(selectedImage.uri);
-        analyzeImage(selectedImage.uri);
+        
+        // Optimize the image before sending for analysis
+        const optimizedUri = await optimizeImage(selectedImage.uri);
+        analyzeImage(optimizedUri);
       }
     } catch (error) {
       console.error('Error picking image:', error);
@@ -93,6 +146,12 @@ const CameraScreen = ({ navigation }) => {
     setIsAnalyzing(true);
     
     try {
+      // Check if image URI exists
+      const fileInfo = await FileSystem.getInfoAsync(imageUri);
+      if (!fileInfo.exists) {
+        throw new Error('Image file not found.');
+      }
+      
       const result = await analyzeFoodImage(imageUri);
       
       // Format the result
@@ -105,10 +164,39 @@ const CameraScreen = ({ navigation }) => {
       setAnalysisResult(formattedResult);
     } catch (error) {
       console.error('Error analyzing image:', error);
-      Alert.alert(
-        'Analysis Failed',
-        'There was an error analyzing your food. Please try again or enter details manually.'
-      );
+      
+      // Detailed error handling
+      if (error.message && error.message.includes('OpenAI')) {
+        Alert.alert(
+          'API Error',
+          'There was an error connecting to our AI service. Please check your internet connection and try again.',
+          [
+            { text: 'Try Again', onPress: () => analyzeImage(imageUri) },
+            { text: 'Enter Manually', onPress: () => setShowManualEntry(true) },
+            { text: 'Cancel', style: 'cancel' }
+          ]
+        );
+      } else if (error.message && error.message.includes('network')) {
+        Alert.alert(
+          'Network Error',
+          'Unable to connect to the server. Please check your internet connection and try again.',
+          [
+            { text: 'Try Again', onPress: () => analyzeImage(imageUri) },
+            { text: 'Enter Manually', onPress: () => setShowManualEntry(true) },
+            { text: 'Cancel', style: 'cancel' }
+          ]
+        );
+      } else {
+        Alert.alert(
+          'Analysis Failed',
+          'There was an error analyzing your food. Please try again or enter details manually.',
+          [
+            { text: 'Try Again', onPress: () => analyzeImage(imageUri) },
+            { text: 'Enter Manually', onPress: () => setShowManualEntry(true) },
+            { text: 'Cancel', style: 'cancel', onPress: () => setCapturedImage(null) }
+          ]
+        );
+      }
     } finally {
       setIsAnalyzing(false);
     }
@@ -122,6 +210,7 @@ const CameraScreen = ({ navigation }) => {
     }
     
     setIsAnalyzing(true);
+    setShowManualEntry(false); // Hide the modal while analyzing
     
     try {
       const result = await analyzeFoodText(manualText);
@@ -134,15 +223,53 @@ const CameraScreen = ({ navigation }) => {
       });
       
       setAnalysisResult(formattedResult);
-      setShowManualEntry(false);
     } catch (error) {
       console.error('Error analyzing text:', error);
-      Alert.alert(
-        'Analysis Failed',
-        'There was an error analyzing your food. Please try again.'
-      );
+      
+      // Detailed error handling
+      if (error.message && error.message.includes('OpenAI')) {
+        Alert.alert(
+          'API Error',
+          'There was an error connecting to our AI service. Please check your internet connection and try again.',
+          [
+            { text: 'Try Again', onPress: () => {
+              setShowManualEntry(true);
+              setIsAnalyzing(false);
+            }},
+            { text: 'Cancel', style: 'cancel' }
+          ]
+        );
+      } else if (error.message && error.message.includes('network')) {
+        Alert.alert(
+          'Network Error',
+          'Unable to connect to the server. Please check your internet connection and try again.',
+          [
+            { text: 'Try Again', onPress: () => {
+              setShowManualEntry(true);
+              setIsAnalyzing(false);
+            }},
+            { text: 'Cancel', style: 'cancel' }
+          ]
+        );
+      } else {
+        Alert.alert(
+          'Analysis Failed',
+          'There was an error analyzing your food description. Please try again with more details or different wording.',
+          [
+            { text: 'Try Again', onPress: () => {
+              setShowManualEntry(true);
+              setIsAnalyzing(false);
+            }},
+            { text: 'Cancel', style: 'cancel' }
+          ]
+        );
+      }
     } finally {
-      setIsAnalyzing(false);
+      // Only set isAnalyzing to false if we're not showing the manual entry again
+      // (it will be set to false in the alert handlers if trying again)
+      if (!showManualEntry) {
+        setIsAnalyzing(false);
+      }
     }
   };
   

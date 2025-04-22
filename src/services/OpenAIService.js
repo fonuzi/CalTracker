@@ -35,13 +35,18 @@ export const analyzeFoodImage = async (imageUri) => {
     // Read the image file as base64
     const base64Image = await FileSystem.readAsStringAsync(imageUri, {
       encoding: FileSystem.EncodingType.Base64,
+      quality: 0.6, // Reduce quality to optimize for API requests
     });
+    
+    // Log image size for debugging
+    console.log(`Image size: ${Math.round(base64Image.length / 1024)} KB`);
     
     // Prepare the prompt for image analysis
     const prompt = `
       Please analyze this food image and provide detailed nutritional information in JSON format.
+      Identify all visible food items and estimate their nutritional content as accurately as possible.
       Include the following fields:
-      - name: The name of the food
+      - name: The name of the food (be specific and descriptive)
       - calories: Total calories (numeric value only)
       - protein: Protein in grams (numeric value only)
       - carbs: Carbohydrates in grams (numeric value only)
@@ -49,7 +54,7 @@ export const analyzeFoodImage = async (imageUri) => {
       - fiber: Fiber in grams (numeric value only)
       - sugar: Sugar in grams (numeric value only)
       - serving_size: Serving size (e.g., "1 cup", "100g")
-      - ingredients: Array of main ingredients
+      - ingredients: Array of main ingredients (be comprehensive)
       - health_benefits: Array of health benefits
       - concerns: Array of potential health concerns or allergens
       
