@@ -1,249 +1,280 @@
-import React, { useState, useContext } from 'react';
-import { View, StyleSheet, ScrollView, Alert } from 'react-native';
-import { Text, useTheme, List, Switch, Button, Divider } from 'react-native-paper';
-
-// Import custom components
-import DarkModeToggle from '../components/DarkModeToggle';
-
-// Import context and services
+import React, { useContext, useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Switch,
+  Alert,
+  ActivityIndicator,
+} from 'react-native';
 import { UserContext } from '../context/UserContext';
+import { Icon } from '../assets/icons';
 import { saveAppSettings, getAppSettings, clearAllData } from '../services/StorageService';
+import * as Animatable from 'react-native-animatable';
 
-const SettingsScreen = ({ navigation, route }) => {
-  const theme = useTheme();
-  const { userProfile, resetUserProfile } = useContext(UserContext);
-  
-  // Get the toggleTheme function from route params
-  const { isDarkMode, toggleTheme } = route.params || {};
-  
-  // State for settings
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  const [stepTrackingEnabled, setStepTrackingEnabled] = useState(true);
-  const [unitSystem, setUnitSystem] = useState('metric'); // 'metric' or 'imperial'
-  
-  // Function to handle toggling notifications
-  const handleToggleNotifications = async (value) => {
-    setNotificationsEnabled(value);
-    
+const SettingsScreen = ({ navigation, theme }) => {
+  const { userProfile, updateUserProfile } = useContext(UserContext);
+  const [loading, setLoading] = useState(false);
+  const [settings, setSettings] = useState({
+    notifications: true,
+    stepTracking: true,
+    dataSync: false,
+  });
+
+  // Toggle a setting
+  const toggleSetting = async (key) => {
     try {
-      await saveAppSettings({ notificationsEnabled: value });
+      const newSettings = {
+        ...settings,
+        [key]: !settings[key],
+      };
+      
+      setSettings(newSettings);
+      await saveAppSettings(newSettings);
     } catch (error) {
-      console.error('Error saving notification settings:', error);
+      console.error(`Error toggling ${key} setting:`, error);
     }
   };
-  
-  // Function to handle toggling step tracking
-  const handleToggleStepTracking = async (value) => {
-    setStepTrackingEnabled(value);
-    
-    try {
-      await saveAppSettings({ stepTrackingEnabled: value });
-    } catch (error) {
-      console.error('Error saving step tracking settings:', error);
-    }
-  };
-  
-  // Function to handle changing unit system
-  const handleChangeUnitSystem = async (value) => {
-    setUnitSystem(value);
-    
-    try {
-      await saveAppSettings({ unitSystem: value });
-    } catch (error) {
-      console.error('Error saving unit system settings:', error);
-    }
-  };
-  
-  // Function to handle logging out
-  const handleLogout = () => {
-    Alert.alert(
-      'Log Out',
-      'Are you sure you want to log out? Your data will remain on this device.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Log Out', 
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await resetUserProfile();
-              navigation.replace('Onboarding');
-            } catch (error) {
-              console.error('Error logging out:', error);
-            }
-          }
-        }
-      ]
-    );
-  };
-  
-  // Function to handle clearing all data
+
+  // Handle logout or clear all data
   const handleClearData = () => {
     Alert.alert(
       'Clear All Data',
-      'Are you sure you want to clear all data? This action cannot be undone.',
+      'This will delete all your data and reset the app. This action cannot be undone.',
       [
-        { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Clear Data', 
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Clear Data',
           style: 'destructive',
           onPress: async () => {
             try {
+              setLoading(true);
               await clearAllData();
-              await resetUserProfile();
-              navigation.replace('Onboarding');
+              // Reset user profile in context
+              updateUserProfile(null);
             } catch (error) {
               console.error('Error clearing data:', error);
+              Alert.alert('Error', 'Failed to clear data. Please try again.');
+            } finally {
+              setLoading(false);
             }
-          }
-        }
+          },
+        },
       ]
     );
   };
-  
-  return (
-    <ScrollView style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-          Appearance
-        </Text>
-        <DarkModeToggle isDarkMode={isDarkMode} onToggle={toggleTheme} />
-      </View>
-      
-      <Divider style={[styles.divider, { backgroundColor: theme.colors.border }]} />
-      
-      <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-          Notifications
-        </Text>
-        <List.Item
-          title="Enable Notifications"
-          description="Receive reminders and updates"
-          titleStyle={{ color: theme.colors.text }}
-          descriptionStyle={{ color: theme.colors.secondaryText }}
-          right={() => (
-            <Switch
-              value={notificationsEnabled}
-              onValueChange={handleToggleNotifications}
-              color={theme.colors.primary}
-            />
-          )}
-        />
-      </View>
-      
-      <Divider style={[styles.divider, { backgroundColor: theme.colors.border }]} />
-      
-      <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-          Tracking
-        </Text>
-        <List.Item
-          title="Step Tracking"
-          description="Track daily steps and activity"
-          titleStyle={{ color: theme.colors.text }}
-          descriptionStyle={{ color: theme.colors.secondaryText }}
-          right={() => (
-            <Switch
-              value={stepTrackingEnabled}
-              onValueChange={handleToggleStepTracking}
-              color={theme.colors.primary}
-            />
-          )}
-        />
-      </View>
-      
-      <Divider style={[styles.divider, { backgroundColor: theme.colors.border }]} />
-      
-      <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-          Units
-        </Text>
-        <List.Item
-          title="Metric System"
-          description="Use kilograms, centimeters"
-          titleStyle={{ color: theme.colors.text }}
-          descriptionStyle={{ color: theme.colors.secondaryText }}
-          onPress={() => handleChangeUnitSystem('metric')}
-          right={() => (
-            <List.Icon 
-              icon={unitSystem === 'metric' ? 'check' : 'blank'} 
-              color={theme.colors.primary} 
-            />
-          )}
-        />
-        <List.Item
-          title="Imperial System"
-          description="Use pounds, inches"
-          titleStyle={{ color: theme.colors.text }}
-          descriptionStyle={{ color: theme.colors.secondaryText }}
-          onPress={() => handleChangeUnitSystem('imperial')}
-          right={() => (
-            <List.Icon 
-              icon={unitSystem === 'imperial' ? 'check' : 'blank'} 
-              color={theme.colors.primary} 
-            />
-          )}
-        />
-      </View>
-      
-      <Divider style={[styles.divider, { backgroundColor: theme.colors.border }]} />
-      
-      <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-          Account
-        </Text>
-        <List.Item
-          title="Edit Profile"
-          titleStyle={{ color: theme.colors.text }}
-          left={() => <List.Icon icon="account-edit" color={theme.colors.primary} />}
-          onPress={() => navigation.navigate('Profile')}
-        />
-        <List.Item
-          title="Log Out"
-          titleStyle={{ color: theme.colors.text }}
-          left={() => <List.Icon icon="logout" color={theme.colors.warning} />}
-          onPress={handleLogout}
-        />
-      </View>
-      
-      <Divider style={[styles.divider, { backgroundColor: theme.colors.border }]} />
-      
-      <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-          About
-        </Text>
-        <List.Item
-          title="Version"
-          description="1.0.0"
-          titleStyle={{ color: theme.colors.text }}
-          descriptionStyle={{ color: theme.colors.secondaryText }}
-        />
-        <List.Item
-          title="Terms of Service"
-          titleStyle={{ color: theme.colors.text }}
-          left={() => <List.Icon icon="file-document" color={theme.colors.primary} />}
-        />
-        <List.Item
-          title="Privacy Policy"
-          titleStyle={{ color: theme.colors.text }}
-          left={() => <List.Icon icon="shield-account" color={theme.colors.primary} />}
-        />
-      </View>
-      
-      <Divider style={[styles.divider, { backgroundColor: theme.colors.border }]} />
-      
-      <View style={styles.dangerSection}>
-        <Button
-          mode="outlined"
-          color={theme.colors.error}
-          icon="delete"
-          style={[styles.dangerButton, { borderColor: theme.colors.error }]}
-          labelStyle={{ color: theme.colors.error }}
-          onPress={handleClearData}
+
+  // Go to profile screen
+  const handleEditProfile = () => {
+    navigation.navigate('Profile');
+  };
+
+  // Setting item component
+  const SettingItem = ({ icon, title, description, value, onToggle, iconColor }) => (
+    <View style={[styles.settingItem, { borderBottomColor: theme.colors.divider }]}>
+      <View style={styles.settingContent}>
+        <View
+          style={[
+            styles.iconContainer,
+            { backgroundColor: (iconColor || theme.colors.primary) + '20' },
+          ]}
         >
-          Clear All Data
-        </Button>
+          <Icon
+            name={icon}
+            size={20}
+            color={iconColor || theme.colors.primary}
+          />
+        </View>
+        <View style={styles.settingTextContainer}>
+          <Text style={[styles.settingTitle, { color: theme.colors.text }]}>
+            {title}
+          </Text>
+          {description && (
+            <Text
+              style={[
+                styles.settingDescription,
+                { color: theme.colors.secondaryText },
+              ]}
+            >
+              {description}
+            </Text>
+          )}
+        </View>
       </View>
+      {typeof value === 'boolean' ? (
+        <Switch
+          value={value}
+          onValueChange={onToggle}
+          trackColor={{
+            false: theme.colors.border,
+            true: theme.colors.primary,
+          }}
+          thumbColor="#FFFFFF"
+        />
+      ) : (
+        <Icon
+          name="chevron-right"
+          size={20}
+          color={theme.colors.secondaryText}
+        />
+      )}
+    </View>
+  );
+
+  // Loading indicator
+  if (loading) {
+    return (
+      <View style={[styles.loadingContainer, { backgroundColor: theme.colors.background }]}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+      </View>
+    );
+  }
+
+  return (
+    <ScrollView
+      style={[styles.container, { backgroundColor: theme.colors.background }]}
+      contentContainerStyle={styles.contentContainer}
+    >
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
+          Settings
+        </Text>
+      </View>
+
+      {/* Profile Section */}
+      <Animatable.View animation="fadeIn" duration={600}>
+        <Text style={[styles.sectionTitle, { color: theme.colors.secondaryText }]}>
+          PROFILE
+        </Text>
+        
+        <TouchableOpacity
+          style={[styles.profileCard, { backgroundColor: theme.colors.surface }]}
+          onPress={handleEditProfile}
+        >
+          <View style={styles.profileContent}>
+            <View
+              style={[
+                styles.profileIconContainer,
+                { backgroundColor: theme.colors.primary + '20' },
+              ]}
+            >
+              <Icon name="user" size={24} color={theme.colors.primary} />
+            </View>
+            <View style={styles.profileInfo}>
+              <Text style={[styles.profileName, { color: theme.colors.text }]}>
+                {userProfile?.name || 'User'}
+              </Text>
+              <Text
+                style={[
+                  styles.profileDetails,
+                  { color: theme.colors.secondaryText },
+                ]}
+              >
+                {userProfile?.email || 'Tap to edit profile'}
+              </Text>
+            </View>
+          </View>
+          <Icon
+            name="chevron-right"
+            size={20}
+            color={theme.colors.secondaryText}
+          />
+        </TouchableOpacity>
+      </Animatable.View>
+
+      {/* App Settings */}
+      <Animatable.View animation="fadeIn" duration={600} delay={100}>
+        <Text style={[styles.sectionTitle, { color: theme.colors.secondaryText }]}>
+          APP SETTINGS
+        </Text>
+
+        <View style={[styles.card, { backgroundColor: theme.colors.surface }]}>
+          <SettingItem
+            icon="bell"
+            title="Notifications"
+            description="Enable push notifications"
+            value={settings.notifications}
+            onToggle={() => toggleSetting('notifications')}
+          />
+
+          <SettingItem
+            icon="activity"
+            title="Step Tracking"
+            description="Track your daily steps"
+            value={settings.stepTracking}
+            onToggle={() => toggleSetting('stepTracking')}
+          />
+
+          <SettingItem
+            icon="smartphone"
+            title="Appearance"
+            description={theme.isDark ? 'Dark Mode' : 'Light Mode'}
+            onToggle={theme.toggleTheme}
+            value={theme.isDark}
+          />
+        </View>
+      </Animatable.View>
+
+      {/* Support */}
+      <Animatable.View animation="fadeIn" duration={600} delay={200}>
+        <Text style={[styles.sectionTitle, { color: theme.colors.secondaryText }]}>
+          SUPPORT
+        </Text>
+
+        <View style={[styles.card, { backgroundColor: theme.colors.surface }]}>
+          <SettingItem
+            icon="help-circle"
+            title="Help Center"
+            iconColor={theme.colors.secondary}
+          />
+
+          <SettingItem
+            icon="message-square"
+            title="Contact Us"
+            iconColor={theme.colors.secondary}
+          />
+
+          <SettingItem
+            icon="star"
+            title="Rate the App"
+            iconColor={theme.colors.warning}
+          />
+        </View>
+      </Animatable.View>
+
+      {/* Danger Zone */}
+      <Animatable.View animation="fadeIn" duration={600} delay={300}>
+        <Text style={[styles.sectionTitle, { color: theme.colors.secondaryText }]}>
+          DATA
+        </Text>
+
+        <View style={[styles.card, { backgroundColor: theme.colors.surface }]}>
+          <TouchableOpacity
+            style={styles.dangerButton}
+            onPress={handleClearData}
+          >
+            <Icon name="trash-2" size={20} color={theme.colors.error} />
+            <Text style={[styles.dangerButtonText, { color: theme.colors.error }]}>
+              Clear All Data
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </Animatable.View>
+
+      {/* App Version */}
+      <Animatable.View animation="fadeIn" duration={600} delay={400}>
+        <Text
+          style={[styles.versionText, { color: theme.colors.tertiaryText }]}
+        >
+          Version 1.0.0
+        </Text>
+      </Animatable.View>
     </ScrollView>
   );
 };
@@ -252,26 +283,109 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  section: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginVertical: 8,
-  },
-  divider: {
-    height: 1,
-    marginVertical: 4,
-  },
-  dangerSection: {
+  contentContainer: {
     padding: 16,
+    paddingBottom: 40,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
   },
+  header: {
+    marginBottom: 24,
+    marginTop: 10,
+  },
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+  },
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 12,
+    marginTop: 24,
+  },
+  card: {
+    borderRadius: 16,
+    overflow: 'hidden',
+  },
+  profileCard: {
+    borderRadius: 16,
+    padding: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  profileContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  profileIconContainer: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  profileInfo: {
+    flex: 1,
+  },
+  profileName: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  profileDetails: {
+    fontSize: 14,
+  },
+  settingItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    borderBottomWidth: 1,
+  },
+  settingContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  iconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  settingTextContainer: {
+    flex: 1,
+  },
+  settingTitle: {
+    fontSize: 16,
+    fontWeight: '500',
+    marginBottom: 4,
+  },
+  settingDescription: {
+    fontSize: 14,
+  },
   dangerButton: {
-    width: '100%',
-    marginVertical: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+  },
+  dangerButtonText: {
+    fontSize: 16,
+    fontWeight: '500',
+    marginLeft: 8,
+  },
+  versionText: {
+    fontSize: 14,
+    textAlign: 'center',
+    marginTop: 40,
   },
 });
 

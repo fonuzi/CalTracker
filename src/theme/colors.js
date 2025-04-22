@@ -1,73 +1,65 @@
 /**
- * Color themes for the app
+ * Color definitions for the app's themes
  */
 
-// Dark theme colors
 export const darkTheme = {
+  name: 'dark',
   colors: {
-    // Main colors
-    primary: '#8E7CFF', // Purple
+    // Base colors
+    primary: '#8E7CFF',  // Purple
     secondary: '#4ECDC4', // Teal
-    background: '#121212', // Dark background
-    surface: '#1E1E1E', // Card background
-    error: '#FF6B6B', // Red for errors
+    accent: '#FF6B6B',   // Coral
+    
+    // Background colors
+    background: '#121212', // Main background
+    surface: '#1E1E1E',   // Cards, modals
+    surfaceHighlight: '#2A2A2A', // Highlighted surface
     
     // Text colors
-    text: '#FFFFFF', // White
-    secondaryText: '#BBBBBB', // Light gray
-    placeholder: '#888888', // Medium gray
-    disabled: '#666666', // Dark gray
+    text: '#FFFFFF',     // Primary text
+    secondaryText: '#BBBBBB', // Secondary text
+    tertiaryText: '#888888', // Less important text
+    placeholder: '#777777', // Placeholder text
     
-    // UI element colors
-    border: '#333333', // Border color
-    notification: '#FF6B6B', // Notification color
+    // Utility colors
+    success: '#06D6A0',  // Success states
+    warning: '#FFD166',  // Warning states
+    error: '#FF6B6B',    // Error states
+    caution: '#FF9F43',  // Caution states
     
-    // Nutrition colors
-    protein: '#FF6B6B', // Red for protein
-    carbs: '#4ECDC4', // Teal for carbs
-    fat: '#FFD166', // Yellow for fat
-    
-    // Status colors
-    success: '#06D6A0', // Green
-    warning: '#FFD166', // Yellow
-    
-    // Misc
-    card: '#1E1E1E',
-    backdrop: 'rgba(0, 0, 0, 0.5)',
+    // Border colors
+    border: '#333333',   // Borders
+    divider: '#2A2A2A',  // Divider lines
   },
 };
 
-// Light theme colors
 export const lightTheme = {
+  name: 'light',
   colors: {
-    // Main colors
-    primary: '#7868E6', // Slightly darker purple for contrast
-    secondary: '#3DBBAD', // Slightly darker teal for contrast
-    background: '#F5F5F5', // Light background
-    surface: '#FFFFFF', // White card background
-    error: '#E63946', // Red for errors
+    // Base colors
+    primary: '#6A5AE0',  // Purple
+    secondary: '#2EB4AD', // Teal
+    accent: '#E74C4C',   // Coral
+    
+    // Background colors
+    background: '#F7F7F7', // Main background
+    surface: '#FFFFFF',   // Cards, modals
+    surfaceHighlight: '#F0F0F0', // Highlighted surface
     
     // Text colors
-    text: '#212121', // Dark gray, almost black
-    secondaryText: '#757575', // Medium gray
-    placeholder: '#9E9E9E', // Light gray
-    disabled: '#BDBDBD', // Very light gray
+    text: '#212121',     // Primary text
+    secondaryText: '#757575', // Secondary text
+    tertiaryText: '#9E9E9E', // Less important text
+    placeholder: '#BDBDBD', // Placeholder text
     
-    // UI element colors
-    border: '#E0E0E0', // Light border
-    notification: '#E63946', // Notification color
+    // Utility colors
+    success: '#00BFA5',  // Success states
+    warning: '#FFC107',  // Warning states
+    error: '#F44336',    // Error states
+    caution: '#FF9800',  // Caution states
     
-    // Nutrition colors
-    protein: '#E63946', // Red for protein
-    carbs: '#3DBBAD', // Teal for carbs
-    fat: '#F4A261', // Orange for fat
-    
-    // Status colors
-    success: '#06D6A0', // Green
-    warning: '#F4A261', // Orange
-    
-    // Misc
-    card: '#FFFFFF',
-    backdrop: 'rgba(0, 0, 0, 0.3)',
+    // Border colors
+    border: '#E0E0E0',   // Borders
+    divider: '#EEEEEE',  // Divider lines
   },
 };

@@ -11,53 +11,42 @@ import { Icon } from '../assets/icons';
  * @param {string} color - Color for the icon and progress bar
  * @param {number} goal - Goal amount for this nutrient
  */
-const NutritionCard = ({
-  title,
-  amount = 0,
-  unit = 'g',
-  icon,
-  color,
-  goal = 100,
-  theme,
-}) => {
-  // Calculate percentage
+const NutritionCard = ({ title, amount, unit, icon, color, goal, theme }) => {
+  // Calculate percentage for the progress bar
   const percentage = Math.min(100, Math.round((amount / goal) * 100));
   
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.surface }]}>
-      <View style={styles.headerRow}>
-        <View style={styles.titleContainer}>
-          <Text style={[styles.title, { color: theme.colors.text }]}>{title}</Text>
-          <Text style={[styles.subtitle, { color: theme.colors.secondaryText }]}>
-            {amount} {unit} of {goal} {unit}
-          </Text>
-        </View>
-        
-        <View style={[styles.iconContainer, { backgroundColor: color + '20' }]}>
-          <Icon name={icon} size={18} color={color} />
-        </View>
+      {/* Header with icon and title */}
+      <View style={styles.header}>
+        <Icon name={icon} size={18} color={color} />
+        <Text style={[styles.title, { color: theme.colors.text }]}>{title}</Text>
       </View>
       
-      <View style={styles.progressContainer}>
-        <View
-          style={[
-            styles.progressBar,
-            { backgroundColor: theme.colors.border, width: '100%' },
-          ]}
-        />
+      {/* Amount display */}
+      <Text style={[styles.amount, { color: theme.colors.text }]}>
+        {amount}
+        <Text style={[styles.unit, { color: theme.colors.secondaryText }]}>
+          {unit}
+        </Text>
+      </Text>
+      
+      {/* Progress bar */}
+      <View style={[styles.progressBar, { backgroundColor: theme.colors.border }]}>
         <View
           style={[
             styles.progressFill,
             {
-              backgroundColor: color,
               width: `${percentage}%`,
+              backgroundColor: color,
             },
           ]}
         />
       </View>
       
-      <Text style={[styles.percentageText, { color: theme.colors.secondaryText }]}>
-        {percentage}% of daily goal
+      {/* Goal text */}
+      <Text style={[styles.goal, { color: theme.colors.secondaryText }]}>
+        Goal: {goal}{unit}
       </Text>
     </View>
   );
@@ -65,61 +54,43 @@ const NutritionCard = ({
 
 const styles = StyleSheet.create({
   container: {
-    borderRadius: 12,
-    padding: 15,
-    marginBottom: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 8,
+    width: '31%',
   },
-  headerRow: {
+  header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 15,
-  },
-  titleContainer: {
-    flex: 1,
+    marginBottom: 12,
   },
   title: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
-    marginBottom: 2,
+    marginLeft: 6,
   },
-  subtitle: {
-    fontSize: 12,
-  },
-  iconContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  progressContainer: {
-    height: 6,
-    borderRadius: 3,
-    overflow: 'hidden',
+  amount: {
+    fontSize: 24,
+    fontWeight: 'bold',
     marginBottom: 8,
-    position: 'relative',
+  },
+  unit: {
+    fontSize: 14,
+    fontWeight: 'normal',
+    marginLeft: 2,
   },
   progressBar: {
-    position: 'absolute',
-    height: '100%',
-    left: 0,
-    top: 0,
+    height: 6,
+    borderRadius: 3,
+    marginBottom: 8,
+    overflow: 'hidden',
   },
   progressFill: {
-    position: 'absolute',
     height: '100%',
-    left: 0,
-    top: 0,
+    borderRadius: 3,
   },
-  percentageText: {
+  goal: {
     fontSize: 12,
-    textAlign: 'right',
   },
 });
 

@@ -1,20 +1,22 @@
 import React, { useContext } from 'react';
+import { View } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { UserContext } from '../context/UserContext';
 import { Icon } from '../assets/icons';
 
-// Import screens
+// Screens
 import HomeScreen from '../screens/HomeScreen';
 import FoodLogScreen from '../screens/FoodLogScreen';
 import CameraScreen from '../screens/CameraScreen';
 import StepTrackingScreen from '../screens/StepTrackingScreen';
-import ProfileScreen from '../screens/ProfileScreen';
-import OnboardingScreen from '../screens/OnboardingScreen';
 import SettingsScreen from '../screens/SettingsScreen';
+import OnboardingScreen from '../screens/OnboardingScreen';
+import ProfileScreen from '../screens/ProfileScreen';
+import DarkModeToggle from '../components/DarkModeToggle';
 
-// Create navigation stacks
+// Create navigators
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
 
@@ -22,82 +24,108 @@ const Tab = createBottomTabNavigator();
 const TabNavigator = ({ theme }) => {
   return (
     <Tab.Navigator
-      screenOptions={{
-        tabBarStyle: {
-          backgroundColor: theme.colors.background,
-          borderTopColor: theme.colors.border,
-          paddingBottom: 5,
-          paddingTop: 5,
-          height: 60,
+      screenOptions={({ route }) => ({
+        tabBarIcon: ({ focused, color, size }) => {
+          let iconName;
+
+          if (route.name === 'Home') {
+            iconName = 'home';
+          } else if (route.name === 'Food Log') {
+            iconName = 'book';
+          } else if (route.name === 'Camera') {
+            iconName = 'camera';
+          } else if (route.name === 'Activity') {
+            iconName = 'activity';
+          } else if (route.name === 'Settings') {
+            iconName = 'settings';
+          }
+
+          return <Icon name={iconName} size={size} color={color} />;
         },
         tabBarActiveTintColor: theme.colors.primary,
         tabBarInactiveTintColor: theme.colors.secondaryText,
+        tabBarStyle: {
+          backgroundColor: theme.colors.surface,
+          borderTopColor: theme.colors.border,
+          paddingBottom: 4,
+          paddingTop: 4,
+          height: 60,
+        },
+        tabBarLabelStyle: {
+          fontSize: 12,
+          marginBottom: 4,
+        },
         headerStyle: {
           backgroundColor: theme.colors.background,
         },
         headerTintColor: theme.colors.text,
         headerShadowVisible: false,
-      }}
+      })}
     >
       <Tab.Screen
         name="Home"
-        component={HomeScreen}
         options={{
-          tabBarIcon: ({ color, size }) => (
-            <Icon name="home" size={size} color={color} />
-          ),
+          title: 'Dashboard',
+          headerRight: () => <DarkModeToggle theme={theme} />,
         }}
-      />
+      >
+        {(props) => <HomeScreen {...props} theme={theme} />}
+      </Tab.Screen>
+      
       <Tab.Screen
         name="Food Log"
-        component={FoodLogScreen}
-        options={{
-          tabBarIcon: ({ color, size }) => (
-            <Icon name="book" size={size} color={color} />
-          ),
-        }}
-      />
+      >
+        {(props) => <FoodLogScreen {...props} theme={theme} />}
+      </Tab.Screen>
+      
       <Tab.Screen
-        name="Add Food"
-        component={CameraScreen}
+        name="Camera"
         options={{
-          tabBarIcon: ({ color, size }) => (
-            <Icon name="camera" size={size} color={color} />
+          tabBarButton: (props) => (
+            <View
+              style={{
+                width: 70,
+                height: 70,
+                borderRadius: 35,
+                backgroundColor: theme.colors.primary,
+                justifyContent: 'center',
+                alignItems: 'center',
+                marginTop: -20,
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.2,
+                shadowRadius: 3,
+                elevation: 4,
+              }}
+              {...props}
+            >
+              <Icon name="camera" size={30} color="#FFFFFF" />
+            </View>
           ),
-          headerShown: false,
-          tabBarLabel: 'Add Food',
         }}
-      />
+      >
+        {(props) => <CameraScreen {...props} theme={theme} />}
+      </Tab.Screen>
+      
       <Tab.Screen
         name="Activity"
-        component={StepTrackingScreen}
-        options={{
-          tabBarIcon: ({ color, size }) => (
-            <Icon name="activity" size={size} color={color} />
-          ),
-        }}
-      />
+      >
+        {(props) => <StepTrackingScreen {...props} theme={theme} />}
+      </Tab.Screen>
+      
       <Tab.Screen
-        name="Profile"
-        component={ProfileScreen}
-        options={{
-          tabBarIcon: ({ color, size }) => (
-            <Icon name="user" size={size} color={color} />
-          ),
-        }}
-      />
+        name="Settings"
+      >
+        {(props) => <SettingsScreen {...props} theme={theme} />}
+      </Tab.Screen>
     </Tab.Navigator>
   );
 };
 
 // Main app navigator
 const AppNavigator = ({ theme }) => {
-  const { userProfile, isLoading } = useContext(UserContext);
-  
-  // Show loading screen while checking if user is logged in
-  if (isLoading) {
-    return null; // You could create a loading screen component
-  }
+  const { userProfile } = useContext(UserContext);
+  const isOnboarded = userProfile?.onboardingCompleted;
   
   return (
     <NavigationContainer>
@@ -110,27 +138,37 @@ const AppNavigator = ({ theme }) => {
           headerShadowVisible: false,
         }}
       >
-        {!userProfile ? (
-          // Onboarding flow
-          <Stack.Screen
-            name="Onboarding"
-            component={OnboardingScreen}
-            options={{ headerShown: false }}
-          />
-        ) : (
-          // Main app flow
+        {isOnboarded ? (
           <>
             <Stack.Screen
               name="Main"
               options={{ headerShown: false }}
             >
-              {props => <TabNavigator {...props} theme={theme} />}
+              {() => <TabNavigator theme={theme} />}
             </Stack.Screen>
+            
             <Stack.Screen
-              name="Settings"
-              component={SettingsScreen}
-            />
+              name="Profile"
+            >
+              {(props) => <ProfileScreen {...props} theme={theme} />}
+            </Stack.Screen>
+            
+            <Stack.Screen
+              name="Add Food"
+              options={{
+                presentation: 'modal',
+              }}
+            >
+              {(props) => <CameraScreen {...props} theme={theme} />}
+            </Stack.Screen>
           </>
+        ) : (
+          <Stack.Screen
+            name="Onboarding"
+            options={{ headerShown: false }}
+          >
+            {() => <OnboardingScreen theme={theme} />}
+          </Stack.Screen>
         )}
       </Stack.Navigator>
     </NavigationContainer>

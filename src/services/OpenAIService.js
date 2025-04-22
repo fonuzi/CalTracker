@@ -1,23 +1,17 @@
 import * as FileSystem from 'expo-file-system';
+import OpenAI from 'openai';
+import { Platform } from 'react-native';
 
-// Check if OpenAI API key is available
-const hasOpenAIKey = process.env.OPENAI_API_KEY || false;
+// Get API key from environment variables (note: for Expo web, we need to access it differently)
+const OPENAI_API_KEY = Platform.OS === 'web' 
+  ? process.env.OPENAI_API_KEY || process.env.REACT_APP_OPENAI_API_KEY || '' 
+  : process.env.OPENAI_API_KEY || '';
 
-// Import OpenAI only if key is available to avoid errors
-let OpenAI;
-let openai;
-
-if (hasOpenAIKey) {
-  try {
-    OpenAI = require('openai').default;
-    openai = new OpenAI({ 
-      apiKey: process.env.OPENAI_API_KEY 
-    });
-    console.log('OpenAI client initialized successfully');
-  } catch (error) {
-    console.error('Error initializing OpenAI client:', error);
-  }
-}
+// Initialize OpenAI with API key from environment
+const openai = new OpenAI({ 
+  apiKey: OPENAI_API_KEY,
+  dangerouslyAllowBrowser: true // For demo in browser environment
+});
 
 /**
  * Analyzes a food image to extract nutritional information
@@ -25,76 +19,36 @@ if (hasOpenAIKey) {
  * @returns {Promise<Object>} Nutritional information
  */
 export const analyzeFoodImage = async (imageUri) => {
-  // If OpenAI is not available, return demo data
-  if (!hasOpenAIKey || !openai) {
-    console.log('OpenAI API key not found, using demo data');
-    return getDemoFoodData('image');
-  }
-  
   try {
-    // Read the image file as base64
-    const base64Image = await FileSystem.readAsStringAsync(imageUri, {
-      encoding: FileSystem.EncodingType.Base64,
-    });
+    // Convert image to base64
+    let base64Image;
     
-    // Prepare the prompt for image analysis
-    const prompt = `
-      Please analyze this food image and provide detailed nutritional information in JSON format.
-      Include the following fields:
-      - name: The name of the food
-      - calories: Total calories (numeric value only)
-      - protein: Protein in grams (numeric value only)
-      - carbs: Carbohydrates in grams (numeric value only)
-      - fat: Fat in grams (numeric value only)
-      - fiber: Fiber in grams (numeric value only)
-      - sugar: Sugar in grams (numeric value only)
-      - serving_size: Serving size (e.g., "1 cup", "100g")
-      - ingredients: Array of main ingredients
-      - health_benefits: Array of health benefits
-      - concerns: Array of potential health concerns or allergens
+    if (Platform.OS === 'web') {
+      // Use fetch API for web
+      const response = await fetch(imageUri);
+      const blob = await response.blob();
       
-      Return only valid JSON with these fields.
-    `;
-    
-    // Call the OpenAI API with the image
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o", // the newest OpenAI model is "gpt-4o" which was released May 13, 2024
-      messages: [
-        {
-          role: "user",
-          content: [
-            { type: "text", text: prompt },
-            {
-              type: "image_url",
-              image_url: {
-                url: `data:image/jpeg;base64,${base64Image}`,
-              },
-            },
-          ],
-        },
-      ],
-      response_format: { type: "json_object" },
-      max_tokens: 1000,
-    });
-    
-    // Parse and return the nutrition data
-    const nutritionData = JSON.parse(response.choices[0].message.content);
-    
-    // Ensure all numeric values are actually numbers
-    nutritionData.calories = parseFloat(nutritionData.calories) || 0;
-    nutritionData.protein = parseFloat(nutritionData.protein) || 0;
-    nutritionData.carbs = parseFloat(nutritionData.carbs) || 0;
-    nutritionData.fat = parseFloat(nutritionData.fat) || 0;
-    nutritionData.fiber = parseFloat(nutritionData.fiber) || 0;
-    nutritionData.sugar = parseFloat(nutritionData.sugar) || 0;
-    
-    // Add method information
-    nutritionData.method = 'image';
-    
-    return nutritionData;
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          base64Image = reader.result.split(',')[1];
+          processFoodImageWithOpenAI(base64Image).then(resolve).catch(reject);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    } else {
+      // Use Expo FileSystem for native
+      base64Image = await FileSystem.readAsStringAsync(imageUri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+      
+      return processFoodImageWithOpenAI(base64Image);
+    }
   } catch (error) {
     console.error('Error analyzing food image:', error);
-    // Return demo data if there's an error
+    
+    // Return demo data in case of error to keep app working in demo mode
     return getDemoFoodData('image');
   }
 };
@@ -105,62 +59,52 @@ export const analyzeFoodImage = async (imageUri) => {
  * @returns {Promise<Object>} Nutritional information
  */
 export const analyzeFoodText = async (text) => {
-  // If OpenAI is not available, return demo data
-  if (!hasOpenAIKey || !openai) {
-    console.log('OpenAI API key not found, using demo data');
-    return getDemoFoodData('text', text);
-  }
-  
   try {
-    // Prepare the prompt for text analysis
+    // Construct the prompt for GPT
     const prompt = `
-      Please analyze this food description and provide detailed nutritional information in JSON format.
+      Analyze the following food description and provide detailed nutritional information.
       Food description: "${text}"
       
-      Include the following fields:
-      - name: The name of the food
-      - calories: Total calories (numeric value only)
-      - protein: Protein in grams (numeric value only)
-      - carbs: Carbohydrates in grams (numeric value only)
-      - fat: Fat in grams (numeric value only)
-      - fiber: Fiber in grams (numeric value only)
-      - sugar: Sugar in grams (numeric value only)
-      - serving_size: Serving size (e.g., "1 cup", "100g")
-      - ingredients: Array of main ingredients
-      - health_benefits: Array of health benefits
-      - concerns: Array of potential health concerns or allergens
+      Respond with a JSON object in the following format:
+      {
+        "name": "Food name",
+        "calories": number,
+        "protein": number (in grams),
+        "carbs": number (in grams),
+        "fat": number (in grams),
+        "fiber": number (in grams),
+        "sugar": number (in grams),
+        "description": "Brief description of the food",
+        "healthScore": number (1-10 rating),
+        "tips": "Health tips related to this food"
+      }
       
-      Return only valid JSON with these fields.
+      Make sure all numerical values are reasonable estimations based on standard portion sizes.
     `;
     
-    // Call the OpenAI API
+    // Call OpenAI API
     const response = await openai.chat.completions.create({
-      model: "gpt-4o", // the newest OpenAI model is "gpt-4o" which was released May 13, 2024
+      model: "gpt-4o", // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
       messages: [
+        { role: "system", content: "You are a nutritionist AI specializing in food analysis. Provide accurate nutritional information based on food descriptions." },
         { role: "user", content: prompt }
       ],
-      response_format: { type: "json_object" },
-      max_tokens: 1000,
+      response_format: { type: "json_object" }
     });
     
-    // Parse and return the nutrition data
-    const nutritionData = JSON.parse(response.choices[0].message.content);
+    const foodData = JSON.parse(response.choices[0].message.content);
     
-    // Ensure all numeric values are actually numbers
-    nutritionData.calories = parseFloat(nutritionData.calories) || 0;
-    nutritionData.protein = parseFloat(nutritionData.protein) || 0;
-    nutritionData.carbs = parseFloat(nutritionData.carbs) || 0;
-    nutritionData.fat = parseFloat(nutritionData.fat) || 0;
-    nutritionData.fiber = parseFloat(nutritionData.fiber) || 0;
-    nutritionData.sugar = parseFloat(nutritionData.sugar) || 0;
-    
-    // Add method information
-    nutritionData.method = 'text';
-    
-    return nutritionData;
+    // Add timestamp and mealType based on time of day
+    return {
+      ...foodData,
+      timestamp: new Date().toISOString(),
+      mealType: suggestMealTypeByTime(),
+      id: generateFoodId()
+    };
   } catch (error) {
     console.error('Error analyzing food text:', error);
-    // Return demo data if there's an error
+    
+    // Return demo data in case of error to keep app working in demo mode
     return getDemoFoodData('text', text);
   }
 };
@@ -171,74 +115,65 @@ export const analyzeFoodText = async (text) => {
  * @returns {Promise<Object>} Personalized recommendations
  */
 export const analyzeFitnessGoals = async (userData) => {
-  // If OpenAI is not available, return demo data
-  if (!hasOpenAIKey || !openai) {
-    console.log('OpenAI API key not found, using demo data');
-    return getDemoFitnessRecommendations(userData);
-  }
-  
   try {
-    // Extract relevant data for the prompt
-    const {
-      name = '',
-      age = '',
-      gender = '',
-      weight = '',
-      height = '',
-      activityLevel = '',
-      fitnessGoal = '',
-      dietaryRestrictions = [],
-      bmi = '',
-      bmr = '',
-      tdee = '',
-      calorieGoal = '',
-      macroGoals = {}
+    // Construct the prompt for GPT
+    const { 
+      age, 
+      weight, 
+      height, 
+      gender, 
+      activityLevel, 
+      fitnessGoal 
     } = userData;
     
-    // Prepare the prompt
     const prompt = `
-      Please analyze this user's profile and fitness data to provide personalized recommendations.
+      Analyze the following user data and provide personalized fitness and nutrition recommendations:
       
-      User Profile:
-      - Name: ${name}
+      User profile:
       - Age: ${age}
-      - Gender: ${gender}
       - Weight: ${weight} kg
       - Height: ${height} cm
-      - Activity Level: ${activityLevel}
-      - Fitness Goal: ${fitnessGoal}
-      - Dietary Restrictions: ${Array.isArray(dietaryRestrictions) ? dietaryRestrictions.join(', ') : ''}
+      - Gender: ${gender}
+      - Activity level: ${activityLevel}
+      - Fitness goal: ${fitnessGoal}
       
-      Health Metrics:
-      - BMI: ${bmi}
-      - BMR: ${bmr} calories/day
-      - TDEE: ${tdee} calories/day
-      - Calorie Goal: ${calorieGoal} calories/day
-      - Macro Goals: Protein: ${macroGoals.protein || 0}g, Carbs: ${macroGoals.carbs || 0}g, Fat: ${macroGoals.fat || 0}g
-      
-      Based on this information, provide personalized recommendations in JSON format with these fields:
-      - recommendations: Array of 3-5 specific, actionable recommendations for diet and exercise
-      - meal_suggestions: Array of 3 meal ideas that match their goals and restrictions
-      - focus_areas: Array of 2-3 areas to focus on for best results
-      
-      Return only valid JSON with these fields.
+      Respond with a JSON object in the following format:
+      {
+        "calorieGoal": daily calorie goal (number),
+        "macroGoals": {
+          "protein": grams (number),
+          "carbs": grams (number), 
+          "fat": grams (number)
+        },
+        "recommendations": [
+          "recommendation 1",
+          "recommendation 2",
+          "recommendation 3"
+        ],
+        "suggestedMeals": {
+          "breakfast": ["meal suggestion 1", "meal suggestion 2"],
+          "lunch": ["meal suggestion 1", "meal suggestion 2"],
+          "dinner": ["meal suggestion 1", "meal suggestion 2"],
+          "snacks": ["snack suggestion 1", "snack suggestion 2"]
+        }
+      }
     `;
     
-    // Call the OpenAI API
+    // Call OpenAI API
     const response = await openai.chat.completions.create({
-      model: "gpt-4o", // the newest OpenAI model is "gpt-4o" which was released May 13, 2024
+      model: "gpt-4o", // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
       messages: [
+        { role: "system", content: "You are a fitness coach and nutritionist AI. Provide personalized fitness and nutrition recommendations based on user profiles." },
         { role: "user", content: prompt }
       ],
-      response_format: { type: "json_object" },
-      max_tokens: 1000,
+      response_format: { type: "json_object" }
     });
     
-    // Parse and return the recommendations
     return JSON.parse(response.choices[0].message.content);
   } catch (error) {
     console.error('Error analyzing fitness goals:', error);
-    // Return demo data if there's an error
+    
+    // Return demo data in case of error to keep app working in demo mode
     return getDemoFitnessRecommendations(userData);
   }
 };
@@ -251,26 +186,126 @@ export const analyzeFitnessGoals = async (userData) => {
  * @private
  */
 const getDemoFoodData = (method, text = '') => {
-  let foodName = 'Grilled Chicken Salad';
-  
-  // If text method, try to extract food name from text
+  // If text method is used, try to provide more relevant demo data
   if (method === 'text' && text) {
-    foodName = text.length > 30 ? text.substring(0, 30) : text;
+    return getDemoFoodDataFromText(text);
   }
   
+  // Default demo data
   return {
-    name: foodName,
+    id: generateFoodId(),
+    name: 'Grilled Chicken Salad',
     calories: 350,
     protein: 30,
     carbs: 15,
-    fat: 20,
-    fiber: 5,
+    fat: 18,
+    fiber: 4,
     sugar: 3,
-    serving_size: '1 bowl (250g)',
-    ingredients: ['Chicken breast', 'Mixed greens', 'Olive oil', 'Cherry tomatoes', 'Cucumber'],
-    health_benefits: ['High in protein', 'Low in carbs', 'Contains healthy fats'],
-    concerns: ['Contains olive oil (if monitoring fat intake)'],
-    method
+    description: 'Grilled chicken breast with mixed greens, tomatoes, cucumbers, and olive oil dressing.',
+    healthScore: 8,
+    tips: 'This balanced meal is high in protein and low in carbs, making it great for weight management.',
+    timestamp: new Date().toISOString(),
+    mealType: suggestMealTypeByTime()
+  };
+};
+
+/**
+ * Gets demo food data based on text description
+ * @param {string} text - Food description
+ * @returns {Object} Demo food data tailored to the text
+ * @private
+ */
+const getDemoFoodDataFromText = (text) => {
+  const lowerText = text.toLowerCase();
+  let foodData = {};
+  
+  // Check for common foods in the text
+  if (lowerText.includes('pizza')) {
+    foodData = {
+      name: 'Pizza Slice',
+      calories: 285,
+      protein: 12,
+      carbs: 36,
+      fat: 10,
+      fiber: 2,
+      sugar: 3,
+      description: 'Cheese pizza slice with tomato sauce on wheat crust.',
+      healthScore: 5,
+      tips: 'Opt for thin crust and vegetable toppings to make pizza healthier.',
+    };
+  } else if (lowerText.includes('salad')) {
+    foodData = {
+      name: 'Garden Salad',
+      calories: 150,
+      protein: 3,
+      carbs: 10,
+      fat: 10,
+      fiber: 4,
+      sugar: 4,
+      description: 'Fresh mixed greens with various vegetables and light dressing.',
+      healthScore: 9,
+      tips: 'Add lean protein like chicken or tofu to make this a complete meal.',
+    };
+  } else if (lowerText.includes('burger') || lowerText.includes('hamburger')) {
+    foodData = {
+      name: 'Beef Burger',
+      calories: 450,
+      protein: 25,
+      carbs: 30,
+      fat: 25,
+      fiber: 2,
+      sugar: 6,
+      description: 'Beef patty with lettuce, tomato, and condiments on a bun.',
+      healthScore: 4,
+      tips: 'Try a lettuce wrap instead of a bun to reduce carbohydrates.',
+    };
+  } else if (lowerText.includes('chicken')) {
+    foodData = {
+      name: 'Grilled Chicken',
+      calories: 200,
+      protein: 30,
+      carbs: 0,
+      fat: 8,
+      fiber: 0,
+      sugar: 0,
+      description: 'Seasoned, grilled chicken breast.',
+      healthScore: 8,
+      tips: 'Excellent source of lean protein, pair with vegetables for a complete meal.',
+    };
+  } else if (lowerText.includes('pasta') || lowerText.includes('spaghetti')) {
+    foodData = {
+      name: 'Pasta with Tomato Sauce',
+      calories: 380,
+      protein: 12,
+      carbs: 70,
+      fat: 6,
+      fiber: 4,
+      sugar: 10,
+      description: 'Pasta with homemade tomato sauce and herbs.',
+      healthScore: 6,
+      tips: 'Try whole grain pasta for more fiber and nutrients.',
+    };
+  } else {
+    // Generic food data if no matches
+    foodData = {
+      name: text.charAt(0).toUpperCase() + text.slice(1),
+      calories: 300,
+      protein: 15,
+      carbs: 30,
+      fat: 12,
+      fiber: 3,
+      sugar: 5,
+      description: `${text} with typical ingredients.`,
+      healthScore: 6,
+      tips: 'Portion control is key to maintaining a balanced diet.',
+    };
+  }
+  
+  return {
+    ...foodData,
+    id: generateFoodId(),
+    timestamp: new Date().toISOString(),
+    mealType: suggestMealTypeByTime()
   };
 };
 
@@ -281,40 +316,205 @@ const getDemoFoodData = (method, text = '') => {
  * @private
  */
 const getDemoFitnessRecommendations = (userData) => {
-  const fitnessGoal = userData?.fitnessGoal?.toLowerCase() || '';
+  // Default values if userData is incomplete
+  const weight = userData?.weight || 70;
+  const height = userData?.height || 170;
+  const age = userData?.age || 30;
+  const gender = userData?.gender || 'other';
+  const activityLevel = userData?.activityLevel || 'moderate';
+  const fitnessGoal = userData?.fitnessGoal || 'maintain';
   
-  // Adjust recommendations based on fitness goal
-  let recommendations = [
-    'Aim for 10,000 steps daily to increase your overall activity level',
-    'Include strength training 2-3 times per week to build muscle',
-    'Stay hydrated by drinking at least 8 cups of water daily',
-    'Get 7-9 hours of quality sleep each night for optimal recovery'
-  ];
-  
-  let mealSuggestions = [
-    'Protein smoothie with berries, spinach, and protein powder',
-    'Grilled chicken with roasted vegetables and quinoa',
-    'Greek yogurt with nuts, berries, and a drizzle of honey'
-  ];
-  
-  let focusAreas = [
-    'Consistent daily activity',
-    'Balanced nutrition'
-  ];
-  
-  // Adjust recommendations for specific goals
-  if (fitnessGoal.includes('weight loss')) {
-    recommendations.push('Create a moderate calorie deficit of 300-500 calories per day');
-    focusAreas.push('Portion control');
-  } else if (fitnessGoal.includes('muscle') || fitnessGoal.includes('strength')) {
-    recommendations.push('Increase protein intake to support muscle growth');
-    mealSuggestions[1] = 'Salmon with sweet potato and steamed broccoli';
-    focusAreas.push('Progressive overload in strength training');
+  // Basic BMR calculation (Mifflin-St Jeor Equation)
+  let bmr;
+  if (gender === 'male') {
+    bmr = 10 * weight + 6.25 * height - 5 * age + 5;
+  } else {
+    bmr = 10 * weight + 6.25 * height - 5 * age - 161;
   }
   
+  // Adjust based on activity level
+  let activityMultiplier;
+  switch (activityLevel) {
+    case 'sedentary':
+      activityMultiplier = 1.2;
+      break;
+    case 'light':
+      activityMultiplier = 1.375;
+      break;
+    case 'moderate':
+      activityMultiplier = 1.55;
+      break;
+    case 'active':
+      activityMultiplier = 1.725;
+      break;
+    case 'very active':
+      activityMultiplier = 1.9;
+      break;
+    default:
+      activityMultiplier = 1.55;
+  }
+  
+  // Calculate TDEE (Total Daily Energy Expenditure)
+  const tdee = Math.round(bmr * activityMultiplier);
+  
+  // Adjust based on fitness goal
+  let calorieGoal;
+  switch (fitnessGoal) {
+    case 'lose':
+      calorieGoal = Math.round(tdee * 0.85); // 15% deficit
+      break;
+    case 'gain':
+      calorieGoal = Math.round(tdee * 1.15); // 15% surplus
+      break;
+    default:
+      calorieGoal = tdee; // Maintain weight
+  }
+  
+  // Calculate macro distribution
+  let proteinPercentage, carbsPercentage, fatPercentage;
+  
+  switch (fitnessGoal) {
+    case 'lose':
+      proteinPercentage = 0.35; // Higher protein for satiety
+      carbsPercentage = 0.35;
+      fatPercentage = 0.3;
+      break;
+    case 'gain':
+      proteinPercentage = 0.3;
+      carbsPercentage = 0.45; // Higher carbs for energy
+      fatPercentage = 0.25;
+      break;
+    default:
+      proteinPercentage = 0.3;
+      carbsPercentage = 0.4;
+      fatPercentage = 0.3;
+  }
+  
+  // Calculate grams of each macro
+  const proteinGrams = Math.round((calorieGoal * proteinPercentage) / 4); // 4 calories per gram
+  const carbsGrams = Math.round((calorieGoal * carbsPercentage) / 4); // 4 calories per gram
+  const fatGrams = Math.round((calorieGoal * fatPercentage) / 9); // 9 calories per gram
+  
   return {
-    recommendations,
-    meal_suggestions: mealSuggestions,
-    focus_areas: focusAreas
+    calorieGoal,
+    macroGoals: {
+      protein: proteinGrams,
+      carbs: carbsGrams,
+      fat: fatGrams
+    },
+    recommendations: [
+      `Aim for ${calorieGoal} calories per day to ${fitnessGoal === 'lose' ? 'lose' : fitnessGoal === 'gain' ? 'gain' : 'maintain'} weight.`,
+      `Stay hydrated by drinking at least ${Math.round(weight * 0.03 * 100) / 100} liters of water daily.`,
+      `Include at least 150 minutes of moderate aerobic activity per week.`
+    ],
+    suggestedMeals: {
+      breakfast: [
+        `Oatmeal with berries and nuts (${Math.round(calorieGoal * 0.25)} calories)`,
+        `Protein smoothie with banana and spinach (${Math.round(calorieGoal * 0.25)} calories)`
+      ],
+      lunch: [
+        `Grilled chicken salad with avocado (${Math.round(calorieGoal * 0.3)} calories)`,
+        `Quinoa bowl with vegetables and tofu (${Math.round(calorieGoal * 0.3)} calories)`
+      ],
+      dinner: [
+        `Baked salmon with roasted vegetables (${Math.round(calorieGoal * 0.35)} calories)`,
+        `Lean beef stir-fry with brown rice (${Math.round(calorieGoal * 0.35)} calories)`
+      ],
+      snacks: [
+        `Greek yogurt with honey (${Math.round(calorieGoal * 0.1)} calories)`,
+        `Apple with almond butter (${Math.round(calorieGoal * 0.1)} calories)`
+      ]
+    }
   };
+};
+
+/**
+ * Process the food image using OpenAI Vision API
+ * @param {string} base64Image - Base64 encoded image
+ * @returns {Promise<Object>} Nutritional information
+ * @private
+ */
+const processFoodImageWithOpenAI = async (base64Image) => {
+  // Construct the prompt for GPT-4 Vision
+  const prompt = `
+    Analyze this food image and provide detailed nutritional information.
+    Respond with a JSON object in the following format:
+    {
+      "name": "Food name",
+      "calories": number,
+      "protein": number (in grams),
+      "carbs": number (in grams),
+      "fat": number (in grams),
+      "fiber": number (in grams),
+      "sugar": number (in grams),
+      "description": "Brief description of the food",
+      "healthScore": number (1-10 rating),
+      "tips": "Health tips related to this food"
+    }
+    
+    Make sure all numerical values are reasonable estimations based on standard portion sizes.
+  `;
+  
+  // Call OpenAI API
+  const response = await openai.chat.completions.create({
+    model: "gpt-4o", // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
+    messages: [
+      { role: "system", content: "You are a nutritionist AI specializing in food analysis. Provide accurate nutritional information based on food images." },
+      {
+        role: "user",
+        content: [
+          { type: "text", text: prompt },
+          {
+            type: "image_url",
+            image_url: {
+              url: `data:image/jpeg;base64,${base64Image}`
+            }
+          }
+        ]
+      }
+    ],
+    response_format: { type: "json_object" }
+  });
+  
+  const foodData = JSON.parse(response.choices[0].message.content);
+  
+  // Add timestamp and mealType based on time of day
+  return {
+    ...foodData,
+    timestamp: new Date().toISOString(),
+    mealType: suggestMealTypeByTime(),
+    id: generateFoodId()
+  };
+};
+
+/**
+ * Suggests a meal type based on the current time
+ * @returns {string} Suggested meal type
+ * @private
+ */
+const suggestMealTypeByTime = () => {
+  const hour = new Date().getHours();
+  
+  if (hour >= 5 && hour < 10) {
+    return 'breakfast';
+  } else if (hour >= 10 && hour < 12) {
+    return 'snack';
+  } else if (hour >= 12 && hour < 15) {
+    return 'lunch';
+  } else if (hour >= 15 && hour < 18) {
+    return 'snack';
+  } else if (hour >= 18 && hour < 22) {
+    return 'dinner';
+  } else {
+    return 'snack';
+  }
+};
+
+/**
+ * Generates a unique ID for a food entry
+ * @returns {string} Unique ID
+ * @private
+ */
+const generateFoodId = () => {
+  return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 };
