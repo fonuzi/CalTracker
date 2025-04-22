@@ -1,17 +1,115 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   View, 
   Text, 
   StyleSheet, 
   ScrollView, 
   TouchableOpacity,
-  Image
+  Image, 
+  Button,
+  Alert
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Feather } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { NavigationContainer } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { UserProvider, UserContext } from './src/context/UserContext';
+import OnboardingScreen from './src/screens/OnboardingScreen';
+import { darkTheme } from './src/theme/colors';
 
-// Main app component
+const Stack = createNativeStackNavigator();
+const Tab = createBottomTabNavigator();
+
+// Main app component wrapped with providers
 export default function App() {
+  return (
+    <UserProvider>
+      <AppContent />
+    </UserProvider>
+  );
+}
+
+// App content with navigation
+function AppContent() {
+  const [userProfile, setUserProfile] = useState(null);
+  const [isLoading, setIsLoading] = useState(true);
+  
+  // Check for existing user profile
+  useEffect(() => {
+    const checkUserProfile = async () => {
+      try {
+        const profileData = await AsyncStorage.getItem('user_profile');
+        if (profileData) {
+          setUserProfile(JSON.parse(profileData));
+        }
+      } catch (error) {
+        console.error('Error checking user profile:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    
+    checkUserProfile();
+  }, []);
+  
+  // Function to reset user profile (for testing)
+  const resetUserProfile = async () => {
+    try {
+      await AsyncStorage.removeItem('user_profile');
+      setUserProfile(null);
+      Alert.alert('Profile Reset', 'User profile has been reset. You can now access the onboarding screen.');
+    } catch (error) {
+      console.error('Error resetting profile:', error);
+      Alert.alert('Error', 'Failed to reset user profile.');
+    }
+  };
+  
+  if (isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Text style={styles.loadingText}>Loading...</Text>
+      </View>
+    );
+  }
+  
+  // For testing, show a button to reset user profile if already exists
+  if (userProfile) {
+    return (
+      <NavigationContainer>
+        <View style={styles.container}>
+          <StatusBar style="light" />
+          <HomeScreen />
+          <View style={styles.resetButtonContainer}>
+            <Button 
+              title="Reset Profile to Test Onboarding" 
+              onPress={resetUserProfile} 
+              color="#8E7CFF"
+            />
+          </View>
+        </View>
+      </NavigationContainer>
+    );
+  }
+  
+  // Show onboarding if no user profile
+  return (
+    <NavigationContainer>
+      <Stack.Navigator>
+        <Stack.Screen 
+          name="Onboarding" 
+          options={{ headerShown: false }}
+        >
+          {props => <OnboardingScreen {...props} theme={darkTheme} />}
+        </Stack.Screen>
+      </Stack.Navigator>
+    </NavigationContainer>
+  );
+}
+
+// Home screen component (the original App content)
+function HomeScreen() {
   const [dailyCalories, setDailyCalories] = useState(1200);
   const [calorieGoal, setCalorieGoal] = useState(2000);
   const [protein, setProtein] = useState(45);
