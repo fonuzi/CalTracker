@@ -1,0 +1,59 @@
+{
+  "expo": {
+    "name": "NutriTrack AI",
+    "slug": "nutritrack-ai",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./src/assets/icon.png",
+    "splash": {
+      "image": "./src/assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#121212"
+    },
+    "updates": {
+      "fallbackToCacheTimeout": 0
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.nutritrack.ai",
+      "infoPlist": {
+        "NSCameraUsageDescription": "This app uses the camera to analyze food for nutritional information.",
+        "NSPhotoLibraryUsageDescription": "This app accesses your photos to analyze food for nutritional information.",
+        "NSHealthShareUsageDescription": "This app reads your step count to help track your fitness goals.",
+        "NSHealthUpdateUsageDescription": "This app may save step count information to help track your fitness goals."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./src/assets/adaptive-icon.png",
+        "backgroundColor": "#121212"
+      },
+      "permissions": [
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
+      ]
+    },
+    "web": {
+      "favicon": "./src/assets/favicon.png"
+    },
+    "plugins": [
+      [
+        "expo-sensors",
+        {
+          "motionPermission": "Allow $(PRODUCT_NAME) to access your device motion to count steps."
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow $(PRODUCT_NAME) to access your camera to capture food for analysis."
+        }
+      ]
+    ],
+    "userInterfaceStyle": "dark"
+  }
+}
