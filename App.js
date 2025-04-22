@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { 
   View, 
   Text, 
@@ -36,7 +36,7 @@ function AppContent() {
   const [userProfile, setUserProfile] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   
-  // Check for existing user profile
+  // Check for existing user profile with periodic polling
   useEffect(() => {
     const checkUserProfile = async () => {
       try {
@@ -51,7 +51,18 @@ function AppContent() {
       }
     };
     
+    // Initial check
     checkUserProfile();
+    
+    // Set up a polling mechanism to check for user profile changes
+    // This helps ensure that if the profile is created in onboarding, 
+    // we detect it and update the UI accordingly
+    const profilePollInterval = setInterval(() => {
+      checkUserProfile();
+    }, 2000); // Check every 2 seconds
+    
+    // Clear the interval when the component unmounts
+    return () => clearInterval(profilePollInterval);
   }, []);
   
   // Function to reset user profile (for testing)
@@ -110,18 +121,26 @@ function AppContent() {
 
 // Home screen component (the original App content)
 function HomeScreen() {
+  const { userProfile } = useContext(UserContext);
   const [dailyCalories, setDailyCalories] = useState(1200);
-  const [calorieGoal, setCalorieGoal] = useState(2000);
-  const [protein, setProtein] = useState(45);
-  const [carbs, setCarbs] = useState(120);
-  const [fat, setFat] = useState(30);
   const [steps, setSteps] = useState(5300);
+  
+  // Get goals from user profile if available
+  const calorieGoal = userProfile?.calorieGoal || 2000;
+  const proteinGoal = userProfile?.macroGoals?.protein || 80;
+  const carbsGoal = userProfile?.macroGoals?.carbs || 200;
+  const fatGoal = userProfile?.macroGoals?.fat || 60;
+  
+  // Current consumption (normally would be tracked through the day)
+  const protein = Math.round(proteinGoal * 0.45);  // Simulating 45% of goal consumed
+  const carbs = Math.round(carbsGoal * 0.6);       // Simulating 60% of goal consumed  
+  const fat = Math.round(fatGoal * 0.5);           // Simulating 50% of goal consumed
   
   // Calculate percentages
   const caloriePercentage = Math.min(100, Math.round((dailyCalories / calorieGoal) * 100));
-  const proteinPercentage = Math.min(100, Math.round((protein / 80) * 100));
-  const carbsPercentage = Math.min(100, Math.round((carbs / 200) * 100));
-  const fatPercentage = Math.min(100, Math.round((fat / 60) * 100));
+  const proteinPercentage = Math.min(100, Math.round((protein / proteinGoal) * 100));
+  const carbsPercentage = Math.min(100, Math.round((carbs / carbsGoal) * 100));
+  const fatPercentage = Math.min(100, Math.round((fat / fatGoal) * 100));
   const stepsPercentage = Math.min(100, Math.round((steps / 10000) * 100));
   
   return (
@@ -132,7 +151,7 @@ function HomeScreen() {
         <View style={styles.header}>
           <View>
             <Text style={styles.welcomeText}>Welcome back,</Text>
-            <Text style={styles.nameText}>Friend</Text>
+            <Text style={styles.nameText}>{userProfile?.name || 'Friend'}</Text>
           </View>
           <TouchableOpacity style={styles.profileButton}>
             <Feather name="user" size={24} color="#8E7CFF" />
@@ -281,6 +300,24 @@ function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
+  loadingContainer: {
+    flex: 1,
+    backgroundColor: '#121212',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+  },
+  resetButtonContainer: {
+    position: 'absolute',
+    bottom: 20,
+    left: 0,
+    right: 0,
+    padding: 10,
+    alignItems: 'center',
+  },
   container: {
     flex: 1,
     backgroundColor: '#121212',

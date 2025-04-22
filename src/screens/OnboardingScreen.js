@@ -608,29 +608,63 @@ const OnboardingScreen = ({ theme }) => {
               <TouchableOpacity
                 style={[styles.button, { backgroundColor: theme.colors.primary }]}
                 onPress={() => {
-                  // The navigation will happen automatically when the App component 
-                  // detects the updated user profile, but we'll force a reload just to be sure
-                  AsyncStorage.getItem('user_profile')
-                    .then(() => {
-                      // This will refresh the app and show the home screen
-                      // since user profile now exists in AsyncStorage
+                  // Create a direct function to handle profile completion and navigation
+                  const completeProfile = async () => {
+                    try {
+                      // Get the user profile directly from the context
+                      const profileJson = JSON.stringify(userData);
+                      
+                      // First save to AsyncStorage to make sure it persists
+                      await AsyncStorage.setItem('user_profile', profileJson);
+                      
+                      // Show confirmation to user
                       Alert.alert(
                         "Profile Created",
-                        "Your profile has been created successfully! Click OK to continue to the app.",
+                        "Your profile has been created successfully!",
                         [
                           { 
-                            text: "OK", 
+                            text: "Continue to App", 
                             onPress: () => {
-                              // Force reload the app to show home screen
-                              window.location.reload();
+                              // Use a hard reset approach by clearing AsyncStorage and then 
+                              // immediately setting it again - this forces a state update in App.js
+                              AsyncStorage.removeItem('user_profile')
+                                .then(() => {
+                                  setTimeout(() => {
+                                    AsyncStorage.setItem('user_profile', profileJson)
+                                      .then(() => {
+                                        // Try a few different methods to force navigation
+                                        if (window && window.location) {
+                                          window.location.href = '/';
+                                        } else {
+                                          // For native environments
+                                          try {
+                                            if (Platform.OS === 'web') {
+                                              document.location.reload();
+                                            } else {
+                                              // Last resort - force a complete app reload
+                                              setTimeout(() => {
+                                                window.location.reload();
+                                              }, 500);
+                                            }
+                                          } catch (e) {
+                                            console.error('Navigation error:', e);
+                                          }
+                                        }
+                                      });
+                                  }, 300);
+                                });
                             }
                           }
                         ]
                       );
-                    })
-                    .catch(error => {
-                      console.error('Error fetching profile:', error);
-                    });
+                    } catch (error) {
+                      console.error('Error completing profile:', error);
+                      Alert.alert('Error', 'Failed to save your profile. Please try again.');
+                    }
+                  };
+                  
+                  // Execute the function
+                  completeProfile();
                 }}
               >
                 <Text style={styles.buttonText}>Get Started</Text>
