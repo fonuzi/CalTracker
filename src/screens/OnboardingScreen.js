@@ -473,17 +473,79 @@ const OnboardingScreen = ({ theme }) => {
         );
         
       case 6:
-        // Final step with recommendations
+        // Final step with summary and recommendations
         return (
           <Animatable.View animation="fadeIn" duration={500}>
             <Text style={[styles.stepTitle, { color: theme.colors.text }]}>
               You're all set!
             </Text>
             <Text style={[styles.stepDescription, { color: theme.colors.secondaryText }]}>
-              Based on your information, here are some personalized recommendations:
+              Here's a summary of your profile and personalized recommendations:
             </Text>
             
-            {recommendations && (
+            {/* Profile Summary */}
+            <View style={styles.summaryContainer}>
+              <Text style={[styles.sectionLabel, { color: theme.colors.text }]}>
+                Your Profile
+              </Text>
+              
+              <View style={styles.profileSummaryRow}>
+                <Text style={[styles.profileSummaryLabel, { color: theme.colors.secondaryText }]}>
+                  Name:
+                </Text>
+                <Text style={[styles.profileSummaryValue, { color: theme.colors.text }]}>
+                  {userData.name}
+                </Text>
+              </View>
+              
+              <View style={styles.profileSummaryRow}>
+                <Text style={[styles.profileSummaryLabel, { color: theme.colors.secondaryText }]}>
+                  Age:
+                </Text>
+                <Text style={[styles.profileSummaryValue, { color: theme.colors.text }]}>
+                  {userData.age} years
+                </Text>
+              </View>
+              
+              <View style={styles.profileSummaryRow}>
+                <Text style={[styles.profileSummaryLabel, { color: theme.colors.secondaryText }]}>
+                  Gender:
+                </Text>
+                <Text style={[styles.profileSummaryValue, { color: theme.colors.text }]}>
+                  {userData.gender.charAt(0).toUpperCase() + userData.gender.slice(1)}
+                </Text>
+              </View>
+              
+              <View style={styles.profileSummaryRow}>
+                <Text style={[styles.profileSummaryLabel, { color: theme.colors.secondaryText }]}>
+                  Weight:
+                </Text>
+                <Text style={[styles.profileSummaryValue, { color: theme.colors.text }]}>
+                  {userData.useMetricUnits ? `${userData.weight} kg` : `${userData.weight} lb`}
+                </Text>
+              </View>
+              
+              <View style={styles.profileSummaryRow}>
+                <Text style={[styles.profileSummaryLabel, { color: theme.colors.secondaryText }]}>
+                  Height:
+                </Text>
+                <Text style={[styles.profileSummaryValue, { color: theme.colors.text }]}>
+                  {userData.useMetricUnits ? `${userData.height} cm` : `${userData.height} in`}
+                </Text>
+              </View>
+              
+              <View style={styles.profileSummaryRow}>
+                <Text style={[styles.profileSummaryLabel, { color: theme.colors.secondaryText }]}>
+                  BMI:
+                </Text>
+                <Text style={[styles.profileSummaryValue, { color: theme.colors.text }]}>
+                  {userData.bmi} ({userData.bmiCategory})
+                </Text>
+              </View>
+            </View>
+            
+            {/* Daily Intake Recommendations */}
+            {userData.calorieGoal && (
               <View style={styles.recommendationsContainer}>
                 <Text style={[styles.sectionLabel, { color: theme.colors.text }]}>
                   Recommended Daily Intake
@@ -522,17 +584,21 @@ const OnboardingScreen = ({ theme }) => {
                   </View>
                 </View>
                 
-                <Text style={[styles.sectionLabel, { color: theme.colors.text, marginTop: 15 }]}>
-                  AI Recommendations
-                </Text>
-                {recommendations.recommendations && recommendations.recommendations.map((rec, i) => (
-                  <Text 
-                    key={i} 
-                    style={[styles.recommendationText, { color: theme.colors.secondaryText }]}
-                  >
-                    • {rec}
-                  </Text>
-                ))}
+                {recommendations && recommendations.recommendations && (
+                  <>
+                    <Text style={[styles.sectionLabel, { color: theme.colors.text, marginTop: 15 }]}>
+                      AI Recommendations
+                    </Text>
+                    {recommendations.recommendations.map((rec, i) => (
+                      <Text 
+                        key={i} 
+                        style={[styles.recommendationText, { color: theme.colors.secondaryText }]}
+                      >
+                        • {rec}
+                      </Text>
+                    ))}
+                  </>
+                )}
               </View>
             )}
             
@@ -606,7 +672,25 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    marginHorizontal: 5,
+  },
+  unitsToggleContainer: {
+    marginBottom: 20,
+    marginTop: 5,
+  },
+  unitsToggleLabel: {
+    fontSize: 16,
+    fontWeight: '500',
+    marginBottom: 10,
+  },
+  unitsToggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  unitsLabel: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginHorizontal: 10,
   },
   stepTitle: {
     fontSize: 24,
@@ -731,6 +815,27 @@ const styles = StyleSheet.create({
     fontSize: 16,
     lineHeight: 24,
     marginBottom: 5,
+  },
+  summaryContainer: {
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
+    borderRadius: 10,
+    padding: 15,
+    marginBottom: 20,
+  },
+  profileSummaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0, 0, 0, 0.1)',
+  },
+  profileSummaryLabel: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  profileSummaryValue: {
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 
