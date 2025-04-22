@@ -11,22 +11,31 @@ const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
  */
 export const analyzeFoodImage = async (imageUri) => {
   try {
-    // Read the image file as base64
-    const base64Image = await FileSystem.readAsStringAsync(imageUri, {
-      encoding: FileSystem.EncodingType.Base64,
-    });
+    // Use a simplified approach to handle images
+    let base64Image;
+    
+    try {
+      // Try to read the image file as base64 using FileSystem
+      base64Image = await FileSystem.readAsStringAsync(imageUri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+    } catch (fileError) {
+      console.error('Error reading image file:', fileError);
+      // Fallback to text analysis if image reading fails
+      return analyzeFoodText("A plate of food (image analysis failed, please describe the food)");
+    }
 
     // Prepare the prompt for image analysis
     const prompt = `
       Please analyze this food image and provide detailed nutritional information in JSON format.
       Include the following fields:
       - name: The name of the food
-      - calories: Total calories
-      - protein: Protein in grams
-      - carbs: Carbohydrates in grams
-      - fat: Fat in grams
-      - fiber: Fiber in grams
-      - sugar: Sugar in grams
+      - calories: Total calories (numeric value only)
+      - protein: Protein in grams (numeric value only)
+      - carbs: Carbohydrates in grams (numeric value only)
+      - fat: Fat in grams (numeric value only)
+      - fiber: Fiber in grams (numeric value only)
+      - sugar: Sugar in grams (numeric value only)
       - serving_size: Serving size (e.g., "1 cup", "100g")
       - ingredients: Array of main ingredients
       - health_benefits: Array of health benefits
@@ -35,34 +44,52 @@ export const analyzeFoodImage = async (imageUri) => {
       Return only valid JSON with these fields.
     `;
 
-    // Call the OpenAI API with the image
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o", // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
-      messages: [
-        {
-          role: "user",
-          content: [
-            { type: "text", text: prompt },
-            {
-              type: "image_url",
-              image_url: {
-                url: `data:image/jpeg;base64,${base64Image}`,
+    try {
+      // Call the OpenAI API with the image
+      const response = await openai.chat.completions.create({
+        model: "gpt-4o", // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
+        messages: [
+          {
+            role: "user",
+            content: [
+              { type: "text", text: prompt },
+              {
+                type: "image_url",
+                image_url: {
+                  url: `data:image/jpeg;base64,${base64Image}`,
+                },
               },
-            },
-          ],
-        },
-      ],
-      response_format: { type: "json_object" },
-      max_tokens: 1000,
-    });
+            ],
+          },
+        ],
+        response_format: { type: "json_object" },
+        max_tokens: 1000,
+      });
 
-    // Parse and return the nutrition data
-    const nutritionData = JSON.parse(response.choices[0].message.content);
-    
-    // Add method information
-    nutritionData.method = 'image';
-    
-    return nutritionData;
+      // Parse and return the nutrition data
+      let nutritionData;
+      try {
+        nutritionData = JSON.parse(response.choices[0].message.content);
+        // Make sure all numeric values are actually numbers
+        nutritionData.calories = Number(nutritionData.calories) || 0;
+        nutritionData.protein = Number(nutritionData.protein) || 0;
+        nutritionData.carbs = Number(nutritionData.carbs) || 0;
+        nutritionData.fat = Number(nutritionData.fat) || 0;
+        nutritionData.fiber = Number(nutritionData.fiber) || 0;
+        nutritionData.sugar = Number(nutritionData.sugar) || 0;
+      } catch (jsonError) {
+        console.error('Error parsing JSON response:', jsonError);
+        throw new Error('Invalid response format from AI model');
+      }
+      
+      // Add method information
+      nutritionData.method = 'image';
+      
+      return nutritionData;
+    } catch (aiError) {
+      console.error('Error calling OpenAI API:', aiError);
+      throw aiError;
+    }
     
   } catch (error) {
     console.error('Error analyzing food image:', error);
