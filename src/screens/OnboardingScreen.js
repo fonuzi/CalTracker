@@ -8,8 +8,10 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
-  Switch
+  Switch,
+  Alert
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { UserContext } from '../context/UserContext';
 import { analyzeFitnessGoals } from '../services/OpenAIService';
 import { calculateBMI, calculateBMR, calculateTDEE, calculateCalorieGoal, calculateMacroGoals, getBMICategory } from '../utils/calculators';
@@ -606,8 +608,29 @@ const OnboardingScreen = ({ theme }) => {
               <TouchableOpacity
                 style={[styles.button, { backgroundColor: theme.colors.primary }]}
                 onPress={() => {
-                  // Navigate to the main app
-                  // This will happen automatically because we updated userProfile in context
+                  // The navigation will happen automatically when the App component 
+                  // detects the updated user profile, but we'll force a reload just to be sure
+                  AsyncStorage.getItem('user_profile')
+                    .then(() => {
+                      // This will refresh the app and show the home screen
+                      // since user profile now exists in AsyncStorage
+                      Alert.alert(
+                        "Profile Created",
+                        "Your profile has been created successfully! Click OK to continue to the app.",
+                        [
+                          { 
+                            text: "OK", 
+                            onPress: () => {
+                              // Force reload the app to show home screen
+                              window.location.reload();
+                            }
+                          }
+                        ]
+                      );
+                    })
+                    .catch(error => {
+                      console.error('Error fetching profile:', error);
+                    });
                 }}
               >
                 <Text style={styles.buttonText}>Get Started</Text>
