@@ -1,166 +1,113 @@
 import React, { createContext, useState, useEffect } from 'react';
-import { getUserProfile, getFoodLogs } from '../services/StorageService';
-import { getStepsForToday } from '../services/HealthKitService';
+import { getUserProfile, saveUserProfile } from '../services/StorageService';
+import { calculateBMR, calculateTDEE, calculateCalorieGoal, calculateMacroGoals } from '../utils/calculators';
+import { analyzeFitnessGoals } from '../services/OpenAIService';
 
-// Create context
 export const UserContext = createContext();
 
-// User provider component
 export const UserProvider = ({ children }) => {
-  // State for user profile
   const [userProfile, setUserProfile] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [todaysFoodLogs, setTodaysFoodLogs] = useState([]);
-  const [todaysSteps, setTodaysSteps] = useState(0);
-  const [todaysNutrition, setTodaysNutrition] = useState({
-    calories: 0,
-    protein: 0,
-    carbs: 0,
-    fat: 0,
-  });
+  const [loading, setLoading] = useState(true);
+  const [aiRecommendations, setAiRecommendations] = useState(null);
   
   // Load user profile on mount
   useEffect(() => {
+    const loadUserProfile = async () => {
+      try {
+        const profile = await getUserProfile();
+        
+        if (profile) {
+          setUserProfile(profile);
+          
+          // Get AI recommendations if we have a profile but no recommendations yet
+          if (!profile.aiRecommendations) {
+            getAIRecommendations(profile);
+          } else {
+            setAiRecommendations(profile.aiRecommendations);
+          }
+        }
+      } catch (error) {
+        console.error('Error loading user profile:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    
     loadUserProfile();
   }, []);
   
-  // Load today's food logs
-  useEffect(() => {
-    loadTodaysFoodLogs();
-  }, []);
-  
-  // Load today's steps
-  useEffect(() => {
-    loadTodaysSteps();
-  }, []);
-  
-  // Update nutrition when food logs change
-  useEffect(() => {
-    updateNutritionTotals();
-  }, [todaysFoodLogs]);
-  
-  // Load user profile
-  const loadUserProfile = async () => {
-    try {
-      setIsLoading(true);
-      const profile = await getUserProfile();
-      setUserProfile(profile || null);
-    } catch (error) {
-      console.error('Error loading user profile:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-  
-  // Load today's food logs
-  const loadTodaysFoodLogs = async () => {
-    try {
-      const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-      const logs = await getFoodLogs(today);
-      setTodaysFoodLogs(logs || []);
-    } catch (error) {
-      console.error('Error loading food logs:', error);
-    }
-  };
-  
-  // Load today's steps
-  const loadTodaysSteps = async () => {
-    try {
-      const steps = await getStepsForToday();
-      setTodaysSteps(steps);
-    } catch (error) {
-      console.error('Error loading steps:', error);
-    }
-  };
-  
-  // Update nutrition totals
-  const updateNutritionTotals = () => {
-    if (!todaysFoodLogs || todaysFoodLogs.length === 0) {
-      setTodaysNutrition({
-        calories: 0,
-        protein: 0,
-        carbs: 0,
-        fat: 0,
-      });
-      return;
-    }
-    
-    const totals = todaysFoodLogs.reduce(
-      (acc, food) => {
-        return {
-          calories: acc.calories + (food.calories || 0),
-          protein: acc.protein + (food.protein || 0),
-          carbs: acc.carbs + (food.carbs || 0),
-          fat: acc.fat + (food.fat || 0),
-        };
-      },
-      { calories: 0, protein: 0, carbs: 0, fat: 0 }
-    );
-    
-    setTodaysNutrition(totals);
-  };
-  
-  // Calculate calories remaining
-  const getCaloriesRemaining = () => {
-    if (!userProfile || !userProfile.dailyCalorieGoal) return 0;
-    
-    const remaining = userProfile.dailyCalorieGoal - todaysNutrition.calories;
-    return Math.max(0, remaining);
-  };
-  
-  // Calculate macro percentages
-  const getMacroPercentages = () => {
-    const { protein, carbs, fat } = todaysNutrition;
-    const total = protein * 4 + carbs * 4 + fat * 9;
-    
-    if (total === 0) {
-      return { protein: 0, carbs: 0, fat: 0 };
-    }
-    
-    return {
-      protein: Math.round((protein * 4 * 100) / total),
-      carbs: Math.round((carbs * 4 * 100) / total),
-      fat: Math.round((fat * 9 * 100) / total),
-    };
-  };
-  
   // Update user profile
-  const updateUserProfile = async (newProfile) => {
+  const updateUserProfile = async (profile) => {
     try {
-      setUserProfile(newProfile);
-      await saveUserProfile(newProfile);
+      if (!profile) {
+        await saveUserProfile(null);
+        setUserProfile(null);
+        setAiRecommendations(null);
+        return;
+      }
+      
+      // Calculate calorie and macro goals if not provided
+      if (!profile.calorieGoal) {
+        const bmr = calculateBMR(profile.weight, profile.height, profile.age, profile.gender);
+        const tdee = calculateTDEE(bmr, profile.activityLevel);
+        profile.calorieGoal = calculateCalorieGoal(tdee, profile.fitnessGoal);
+        profile.macroGoals = calculateMacroGoals(profile.calorieGoal, profile.fitnessGoal, profile.weight);
+      }
+      
+      // Save to storage and update state
+      await saveUserProfile(profile);
+      setUserProfile(profile);
+      
+      // Get AI recommendations for the updated profile
+      getAIRecommendations(profile);
     } catch (error) {
       console.error('Error updating user profile:', error);
+      throw error;
     }
   };
   
-  // Refresh all data
-  const refreshData = async () => {
+  // Get AI recommendations for the user profile
+  const getAIRecommendations = async (profile) => {
     try {
-      await Promise.all([
-        loadUserProfile(),
-        loadTodaysFoodLogs(),
-        loadTodaysSteps(),
-      ]);
+      // Only get recommendations if we have a complete profile
+      if (
+        profile &&
+        profile.age &&
+        profile.weight &&
+        profile.height &&
+        profile.gender &&
+        profile.activityLevel &&
+        profile.fitnessGoal
+      ) {
+        // Get recommendations from OpenAI
+        const recommendations = await analyzeFitnessGoals(profile);
+        
+        // Update profile with recommendations
+        const updatedProfile = {
+          ...profile,
+          aiRecommendations: recommendations,
+          // Update calorie and macro goals based on AI recommendations if available
+          calorieGoal: recommendations.calorieGoal || profile.calorieGoal,
+          macroGoals: recommendations.macroGoals || profile.macroGoals,
+        };
+        
+        // Save to storage and update state
+        await saveUserProfile(updatedProfile);
+        setUserProfile(updatedProfile);
+        setAiRecommendations(recommendations);
+      }
     } catch (error) {
-      console.error('Error refreshing data:', error);
+      console.error('Error getting AI recommendations:', error);
     }
   };
   
-  // Provide context
   return (
     <UserContext.Provider
       value={{
         userProfile,
-        isLoading,
-        todaysFoodLogs,
-        todaysSteps,
-        todaysNutrition,
-        getCaloriesRemaining,
-        getMacroPercentages,
         updateUserProfile,
-        refreshData,
-        loadTodaysFoodLogs,
+        aiRecommendations,
+        loading,
       }}
     >
       {children}

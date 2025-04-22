@@ -10,70 +10,60 @@ import { getMealTypeIcon, getMealTypeColor } from '../assets/icons';
  * @param {Function} onDelete - Function to call when delete button is pressed
  */
 const FoodItem = ({ food, onPress, onDelete, theme }) => {
-  if (!food) return null;
-  
-  // Format macros for display
-  const formatMacro = (value) => {
-    if (value === undefined || value === null) return '-';
-    return Math.round(value) + 'g';
+  // Format time from timestamp (e.g., "8:30 AM")
+  const formatTime = (timestamp) => {
+    const date = new Date(timestamp);
+    return date.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    });
   };
   
-  // Get meal type icon and color
+  // Get icon and color for meal type
   const mealTypeIcon = getMealTypeIcon(food.mealType);
   const mealTypeColor = getMealTypeColor(food.mealType);
   
   return (
     <TouchableOpacity
       style={[styles.container, { backgroundColor: theme.colors.surface }]}
-      onPress={onPress}
+      onPress={() => onPress(food)}
       activeOpacity={0.7}
     >
-      {/* Meal type icon */}
-      <View style={[styles.iconContainer, { backgroundColor: mealTypeColor + '20' }]}>
-        <Icon name={mealTypeIcon} size={24} color={mealTypeColor} />
+      {/* Left icon for meal type */}
+      <View
+        style={[
+          styles.iconContainer,
+          { backgroundColor: mealTypeColor + '20' }, // 20% opacity
+        ]}
+      >
+        <Icon name={mealTypeIcon} size={18} color={mealTypeColor} />
       </View>
       
-      {/* Food details */}
-      <View style={styles.detailsContainer}>
+      {/* Food info */}
+      <View style={styles.infoContainer}>
         <Text style={[styles.foodName, { color: theme.colors.text }]}>
           {food.name}
         </Text>
-        
-        <View style={styles.macrosContainer}>
-          <Text style={[styles.caloriesText, { color: theme.colors.text }]}>
-            {Math.round(food.calories || 0)} kcal
-          </Text>
-          
-          <Text style={[styles.macroText, { color: theme.colors.secondaryText }]}>
-            P: {formatMacro(food.protein)}
-          </Text>
-          
-          <Text style={[styles.macroText, { color: theme.colors.secondaryText }]}>
-            C: {formatMacro(food.carbs)}
-          </Text>
-          
-          <Text style={[styles.macroText, { color: theme.colors.secondaryText }]}>
-            F: {formatMacro(food.fat)}
-          </Text>
-        </View>
-        
-        {food.quantity && (
-          <Text style={[styles.quantityText, { color: theme.colors.secondaryText }]}>
-            {food.quantity}
-          </Text>
-        )}
+        <Text style={[styles.foodDetails, { color: theme.colors.secondaryText }]}>
+          {food.calories} cal • P: {Math.round(food.protein)}g • C: {Math.round(food.carbs)}g • F: {Math.round(food.fat)}g
+        </Text>
       </View>
       
-      {/* Delete button */}
-      {onDelete && (
+      {/* Right section with time and delete button */}
+      <View style={styles.rightContainer}>
+        <Text style={[styles.timeText, { color: theme.colors.secondaryText }]}>
+          {formatTime(food.timestamp)}
+        </Text>
+        
         <TouchableOpacity
           style={styles.deleteButton}
-          onPress={() => onDelete(food.id)}
+          onPress={() => onDelete(food)}
           hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
         >
-          <Icon name="trash-2" size={18} color={theme.colors.error} />
+          <Icon name="trash-2" size={16} color={theme.colors.error} />
         </TouchableOpacity>
-      )}
+      </View>
     </TouchableOpacity>
   );
 };
@@ -84,50 +74,36 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     padding: 12,
     marginBottom: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    alignItems: 'center',
   },
   iconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
   },
-  detailsContainer: {
+  infoContainer: {
     flex: 1,
-    justifyContent: 'center',
   },
   foodName: {
     fontSize: 16,
     fontWeight: '600',
     marginBottom: 4,
   },
-  macrosContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-  },
-  caloriesText: {
-    fontSize: 14,
-    fontWeight: '500',
-    marginRight: 10,
-  },
-  macroText: {
+  foodDetails: {
     fontSize: 12,
-    marginRight: 8,
   },
-  quantityText: {
+  rightContainer: {
+    alignItems: 'flex-end',
+  },
+  timeText: {
     fontSize: 12,
-    marginTop: 4,
+    marginBottom: 6,
   },
   deleteButton: {
-    paddingLeft: 10,
-    justifyContent: 'center',
+    padding: 4,
   },
 });
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { TouchableOpacity, StyleSheet, View, Animated } from 'react-native';
+import { TouchableOpacity, StyleSheet } from 'react-native';
 import { Icon } from '../assets/icons';
 
 /**
@@ -7,62 +7,36 @@ import { Icon } from '../assets/icons';
  * @param {boolean} isDarkMode - Whether dark mode is currently enabled
  * @param {Function} onToggle - Function to call when the toggle is pressed
  */
-const DarkModeToggle = ({ isDarkMode, onToggle, style }) => {
+const DarkModeToggle = ({ theme }) => {
   return (
-    <TouchableOpacity 
+    <TouchableOpacity
       style={[
-        styles.container, 
-        isDarkMode ? styles.darkMode : styles.lightMode,
-        style
+        styles.container,
+        {
+          backgroundColor: theme.isDark
+            ? 'rgba(255, 255, 255, 0.2)'
+            : 'rgba(0, 0, 0, 0.1)',
+        },
       ]}
-      onPress={onToggle}
-      activeOpacity={0.7}
+      onPress={theme.toggleTheme}
     >
-      <View style={[
-        styles.handle,
-        isDarkMode ? styles.handleRight : styles.handleLeft
-      ]}>
-        <Icon 
-          name={isDarkMode ? 'moon' : 'sun'} 
-          size={16}
-          color={isDarkMode ? '#FFFFFF' : '#FFC107'}
-        />
-      </View>
+      <Icon
+        name={theme.isDark ? 'sun' : 'moon'}
+        size={18}
+        color={theme.isDark ? '#FFFFFF' : '#000000'}
+      />
     </TouchableOpacity>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    width: 60,
-    height: 30,
-    borderRadius: 15,
-    padding: 4,
-  },
-  darkMode: {
-    backgroundColor: '#1E1E1E',
-    borderColor: '#4A80F0',
-    borderWidth: 1,
-  },
-  lightMode: {
-    backgroundColor: '#F0F3F9',
-    borderColor: '#E5E5E5',
-    borderWidth: 1,
-  },
-  handle: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  handleLeft: {
-    backgroundColor: '#FFFFFF',
-    alignSelf: 'flex-start',
-  },
-  handleRight: {
-    backgroundColor: '#121212',
-    alignSelf: 'flex-end',
+    marginRight: 16,
   },
 });
 

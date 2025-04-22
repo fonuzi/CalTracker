@@ -1,315 +1,269 @@
-import React, { useContext, useState, useEffect } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  ScrollView, 
+import React, { useState, useEffect, useContext } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
   TouchableOpacity,
-  RefreshControl
+  RefreshControl,
 } from 'react-native';
 import { UserContext } from '../context/UserContext';
-import { Icon } from '../assets/icons';
+import { getFoodLogs } from '../services/StorageService';
+import { getStepsForToday } from '../services/HealthKitService';
 import CalorieProgress from '../components/CalorieProgress';
 import NutritionCard from '../components/NutritionCard';
 import StepCounter from '../components/StepCounter';
+import { Icon } from '../assets/icons';
+import { getNutrientColor, getNutrientIcon } from '../assets/icons';
+import { calculateRemainingCalories } from '../utils/foodAnalysis';
 import * as Animatable from 'react-native-animatable';
 
 const HomeScreen = ({ navigation, theme }) => {
   const { userProfile } = useContext(UserContext);
-  
-  // State
+  const [foodLogs, setFoodLogs] = useState([]);
+  const [steps, setSteps] = useState(0);
+  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [todayStats, setTodayStats] = useState({
-    calories: {
-      consumed: 0,
-      goal: 2000,
-    },
-    protein: {
-      consumed: 0,
-      goal: 120,
-    },
-    carbs: {
-      consumed: 0,
-      goal: 250,
-    },
-    fat: {
-      consumed: 0,
-      goal: 70,
-    },
-    steps: {
-      count: 0,
-      goal: 10000,
-    },
-  });
   
-  // Update stats when user profile changes
+  // Default macro goals if user profile is not available yet
+  const defaultMacroGoals = {
+    protein: 100,
+    carbs: 200,
+    fat: 60,
+  };
+  
+  // Default calorie goal if user profile is not available yet
+  const defaultCalorieGoal = 2000;
+  
+  // Load data on mount and when screen is focused
   useEffect(() => {
-    if (userProfile) {
-      updateGoals();
-    }
-  }, [userProfile]);
+    loadData();
+    
+    const unsubscribe = navigation.addListener('focus', () => {
+      loadData();
+    });
+    
+    return unsubscribe;
+  }, [navigation]);
   
-  // Update goals based on user profile
-  const updateGoals = () => {
-    if (!userProfile) return;
-    
-    const { dailyCalorieGoal, macroGoals, stepGoal } = userProfile;
-    
-    if (dailyCalorieGoal) {
-      setTodayStats(prev => ({
-        ...prev,
-        calories: {
-          ...prev.calories,
-          goal: dailyCalorieGoal
-        }
-      }));
-    }
-    
-    if (macroGoals) {
-      setTodayStats(prev => ({
-        ...prev,
-        protein: {
-          ...prev.protein,
-          goal: macroGoals.protein
-        },
-        carbs: {
-          ...prev.carbs,
-          goal: macroGoals.carbs
-        },
-        fat: {
-          ...prev.fat,
-          goal: macroGoals.fat
-        }
-      }));
-    }
-    
-    if (stepGoal) {
-      setTodayStats(prev => ({
-        ...prev,
-        steps: {
-          ...prev.steps,
-          goal: stepGoal
-        }
-      }));
+  // Load all required data
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      
+      // Get today's food logs
+      const today = new Date().toISOString().split('T')[0];
+      const logs = await getFoodLogs(today);
+      setFoodLogs(logs);
+      
+      // Get step count
+      const todaySteps = await getStepsForToday();
+      setSteps(todaySteps);
+    } catch (error) {
+      console.error('Error loading home screen data:', error);
+    } finally {
+      setLoading(false);
     }
   };
   
-  // Refresh data
+  // Pull-to-refresh functionality
   const onRefresh = async () => {
     setRefreshing(true);
-    
-    try {
-      // Load data here
-      await new Promise(resolve => setTimeout(resolve, 1000));
-    } catch (error) {
-      console.error('Error refreshing data:', error);
-    } finally {
-      setRefreshing(false);
-    }
+    await loadData();
+    setRefreshing(false);
   };
   
+  // Calculate total calories consumed today
+  const calculateCaloriesConsumed = () => {
+    return foodLogs.reduce((total, food) => total + food.calories, 0);
+  };
+  
+  // Calculate total macronutrients consumed today
+  const calculateMacrosConsumed = () => {
+    return foodLogs.reduce(
+      (macros, food) => {
+        return {
+          protein: macros.protein + (food.protein || 0),
+          carbs: macros.carbs + (food.carbs || 0),
+          fat: macros.fat + (food.fat || 0),
+        };
+      },
+      { protein: 0, carbs: 0, fat: 0 }
+    );
+  };
+  
+  // Get macro goals from user profile or use defaults
+  const getMacroGoals = () => {
+    return userProfile?.macroGoals || defaultMacroGoals;
+  };
+  
+  // Get calorie goal from user profile or use default
+  const getCalorieGoal = () => {
+    return userProfile?.calorieGoal || defaultCalorieGoal;
+  };
+  
+  // Navigate to Camera screen to add food
+  const handleAddFood = () => {
+    navigation.navigate('Camera');
+  };
+  
+  // Navigate to Activity screen
+  const handleViewActivity = () => {
+    navigation.navigate('Activity');
+  };
+  
+  // Navigate to Food Log screen
+  const handleViewFoodLog = () => {
+    navigation.navigate('Food Log');
+  };
+  
+  // Calculate nutrients consumed
+  const caloriesConsumed = calculateCaloriesConsumed();
+  const macrosConsumed = calculateMacrosConsumed();
+  const macroGoals = getMacroGoals();
+  const calorieGoal = getCalorieGoal();
+  
   return (
-    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={theme.colors.primary}
-          />
-        }
+    <ScrollView
+      style={[styles.container, { backgroundColor: theme.colors.background }]}
+      contentContainerStyle={styles.contentContainer}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+      }
+    >
+      {/* Welcome section */}
+      <Animatable.View
+        animation="fadeIn"
+        duration={600}
+        style={styles.welcomeSection}
       >
-        {/* Header */}
-        <View style={styles.header}>
-          <View>
-            <Text style={[styles.greeting, { color: theme.colors.text }]}>
-              {getGreeting()}
-            </Text>
-            <Text style={[styles.name, { color: theme.colors.text }]}>
-              {userProfile?.name || 'Fitness Enthusiast'}
-            </Text>
-          </View>
-          
-          <TouchableOpacity 
-            style={[styles.profileButton, { backgroundColor: theme.colors.surfaceHighlight }]}
-            onPress={() => navigation.navigate('Profile')}
+        <Text style={[styles.welcomeText, { color: theme.colors.secondaryText }]}>
+          {getGreeting()}
+        </Text>
+        <Text style={[styles.nameText, { color: theme.colors.text }]}>
+          {userProfile?.name || 'Friend'}
+        </Text>
+      </Animatable.View>
+      
+      {/* Calorie progress */}
+      <Animatable.View animation="fadeIn" duration={800} delay={100}>
+        <CalorieProgress
+          consumed={caloriesConsumed}
+          goal={calorieGoal}
+          theme={theme}
+        />
+      </Animatable.View>
+      
+      {/* Macronutrients */}
+      <View style={styles.sectionHeader}>
+        <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+          Macronutrients
+        </Text>
+        <TouchableOpacity onPress={handleViewFoodLog}>
+          <Text style={[styles.sectionLink, { color: theme.colors.primary }]}>
+            See all
+          </Text>
+        </TouchableOpacity>
+      </View>
+      
+      <View style={styles.macroContainer}>
+        {/* Protein */}
+        <Animatable.View animation="fadeInUp" duration={600} delay={200}>
+          <NutritionCard
+            title="Protein"
+            amount={Math.round(macrosConsumed.protein)}
+            unit="g"
+            icon={getNutrientIcon('protein')}
+            color={getNutrientColor('protein')}
+            goal={macroGoals.protein}
+            theme={theme}
+          />
+        </Animatable.View>
+        
+        {/* Carbs */}
+        <Animatable.View animation="fadeInUp" duration={600} delay={300}>
+          <NutritionCard
+            title="Carbs"
+            amount={Math.round(macrosConsumed.carbs)}
+            unit="g"
+            icon={getNutrientIcon('carbs')}
+            color={getNutrientColor('carbs')}
+            goal={macroGoals.carbs}
+            theme={theme}
+          />
+        </Animatable.View>
+        
+        {/* Fat */}
+        <Animatable.View animation="fadeInUp" duration={600} delay={400}>
+          <NutritionCard
+            title="Fat"
+            amount={Math.round(macrosConsumed.fat)}
+            unit="g"
+            icon={getNutrientIcon('fat')}
+            color={getNutrientColor('fat')}
+            goal={macroGoals.fat}
+            theme={theme}
+          />
+        </Animatable.View>
+      </View>
+      
+      {/* Activity section */}
+      <View style={styles.sectionHeader}>
+        <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+          Daily Activity
+        </Text>
+        <TouchableOpacity onPress={handleViewActivity}>
+          <Text style={[styles.sectionLink, { color: theme.colors.primary }]}>
+            Details
+          </Text>
+        </TouchableOpacity>
+      </View>
+      
+      <Animatable.View animation="fadeIn" duration={800} delay={500}>
+        <StepCounter steps={steps} goal={10000} theme={theme} />
+      </Animatable.View>
+      
+      {/* Quick actions */}
+      <View style={styles.quickActionsContainer}>
+        <Animatable.View animation="fadeInUp" duration={600} delay={600}>
+          <TouchableOpacity
+            style={[
+              styles.primaryButton,
+              { backgroundColor: theme.colors.primary },
+            ]}
+            onPress={handleAddFood}
           >
-            <Icon name="user" size={22} color={theme.colors.primary} />
+            <Icon name="camera" size={20} color="#FFFFFF" style={styles.buttonIcon} />
+            <Text style={styles.primaryButtonText}>Take Food Photo</Text>
           </TouchableOpacity>
-        </View>
-        
-        {/* Calorie Progress */}
-        <Animatable.View 
-          animation="fadeInUp" 
-          duration={600}
-          delay={100}
-        >
-          <CalorieProgress
-            consumed={todayStats.calories.consumed}
-            goal={todayStats.calories.goal}
-            theme={theme}
-          />
         </Animatable.View>
         
-        {/* Quick Add Buttons */}
-        <View style={styles.quickAddContainer}>
-          <Animatable.View 
-            animation="fadeInUp" 
-            duration={600}
-            delay={200}
+        <Animatable.View animation="fadeInUp" duration={600} delay={700}>
+          <TouchableOpacity
+            style={[
+              styles.secondaryButton,
+              {
+                backgroundColor: theme.colors.surface,
+                borderColor: theme.colors.border,
+              },
+            ]}
+            onPress={() => navigation.navigate('Add Food')}
           >
-            <TouchableOpacity
-              style={[styles.quickAddButton, { backgroundColor: theme.colors.primary }]}
-              onPress={() => navigation.navigate('Camera')}
+            <Icon
+              name="type"
+              size={20}
+              color={theme.colors.primary}
+              style={styles.buttonIcon}
+            />
+            <Text
+              style={[styles.secondaryButtonText, { color: theme.colors.primary }]}
             >
-              <Icon name="camera" size={20} color="#FFFFFF" style={styles.quickAddIcon} />
-              <Text style={styles.quickAddText}>Add Food</Text>
-            </TouchableOpacity>
-          </Animatable.View>
-          
-          <Animatable.View 
-            animation="fadeInUp" 
-            duration={600}
-            delay={300}
-          >
-            <TouchableOpacity
-              style={[styles.quickAddButton, { backgroundColor: theme.colors.secondary }]}
-              onPress={() => navigation.navigate('Activity')}
-            >
-              <Icon name="activity" size={20} color="#FFFFFF" style={styles.quickAddIcon} />
-              <Text style={styles.quickAddText}>Track Steps</Text>
-            </TouchableOpacity>
-          </Animatable.View>
-        </View>
-        
-        {/* Nutrition Cards */}
-        <View style={styles.nutritionSection}>
-          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-            Today's Nutrition
-          </Text>
-          
-          <View style={styles.nutritionCards}>
-            <Animatable.View 
-              animation="fadeInUp" 
-              duration={600}
-              delay={400}
-              style={styles.nutritionCardWrapper}
-            >
-              <NutritionCard
-                title="Protein"
-                amount={todayStats.protein.consumed}
-                unit="g"
-                icon="target"
-                color={theme.colors.protein}
-                goal={todayStats.protein.goal}
-                theme={theme}
-              />
-            </Animatable.View>
-            
-            <Animatable.View 
-              animation="fadeInUp" 
-              duration={600}
-              delay={500}
-              style={styles.nutritionCardWrapper}
-            >
-              <NutritionCard
-                title="Carbs"
-                amount={todayStats.carbs.consumed}
-                unit="g"
-                icon="circle"
-                color={theme.colors.carbs}
-                goal={todayStats.carbs.goal}
-                theme={theme}
-              />
-            </Animatable.View>
-            
-            <Animatable.View 
-              animation="fadeInUp" 
-              duration={600}
-              delay={600}
-              style={styles.nutritionCardWrapper}
-            >
-              <NutritionCard
-                title="Fat"
-                amount={todayStats.fat.consumed}
-                unit="g"
-                icon="triangle"
-                color={theme.colors.fat}
-                goal={todayStats.fat.goal}
-                theme={theme}
-              />
-            </Animatable.View>
-          </View>
-        </View>
-        
-        {/* Step Counter */}
-        <Animatable.View 
-          animation="fadeInUp" 
-          duration={600}
-          delay={700}
-        >
-          <StepCounter
-            steps={todayStats.steps.count}
-            goal={todayStats.steps.goal}
-            theme={theme}
-            onPress={() => navigation.navigate('Activity')}
-          />
+              Enter Food Details
+            </Text>
+          </TouchableOpacity>
         </Animatable.View>
-        
-        {/* Quick Access */}
-        <View style={styles.quickAccessSection}>
-          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-            Quick Access
-          </Text>
-          
-          <View style={styles.quickAccessCards}>
-            <Animatable.View 
-              animation="fadeInUp" 
-              duration={600}
-              delay={800}
-            >
-              <TouchableOpacity
-                style={[styles.quickAccessCard, { backgroundColor: theme.colors.surface }]}
-                onPress={() => navigation.navigate('Food Log')}
-              >
-                <View style={[styles.quickAccessIconContainer, { backgroundColor: theme.colors.primary + '20' }]}>
-                  <Icon name="book-open" size={24} color={theme.colors.primary} />
-                </View>
-                <Text style={[styles.quickAccessTitle, { color: theme.colors.text }]}>
-                  Food Log
-                </Text>
-                <Text style={[styles.quickAccessSubtitle, { color: theme.colors.secondaryText }]}>
-                  View your meals
-                </Text>
-              </TouchableOpacity>
-            </Animatable.View>
-            
-            <Animatable.View 
-              animation="fadeInUp" 
-              duration={600}
-              delay={900}
-            >
-              <TouchableOpacity
-                style={[styles.quickAccessCard, { backgroundColor: theme.colors.surface }]}
-                onPress={() => {/* Navigate to water tracking */}}
-              >
-                <View style={[styles.quickAccessIconContainer, { backgroundColor: theme.colors.info + '20' }]}>
-                  <Icon name="droplet" size={24} color={theme.colors.info} />
-                </View>
-                <Text style={[styles.quickAccessTitle, { color: theme.colors.text }]}>
-                  Water
-                </Text>
-                <Text style={[styles.quickAccessSubtitle, { color: theme.colors.secondaryText }]}>
-                  Track hydration
-                </Text>
-              </TouchableOpacity>
-            </Animatable.View>
-          </View>
-        </View>
-      </ScrollView>
-    </View>
+      </View>
+    </ScrollView>
   );
 };
 
@@ -318,11 +272,11 @@ const getGreeting = () => {
   const hour = new Date().getHours();
   
   if (hour < 12) {
-    return 'Good Morning';
+    return 'Good morning,';
   } else if (hour < 18) {
-    return 'Good Afternoon';
+    return 'Good afternoon,';
   } else {
-    return 'Good Evening';
+    return 'Good evening,';
   }
 };
 
@@ -330,107 +284,71 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  scrollView: {
-    flex: 1,
+  contentContainer: {
+    padding: 16,
+    paddingBottom: 30,
   },
-  scrollContent: {
-    paddingHorizontal: 16,
-    paddingTop: 60,
-    paddingBottom: 40,
+  welcomeSection: {
+    marginTop: 10,
+    marginBottom: 20,
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 24,
-  },
-  greeting: {
+  welcomeText: {
     fontSize: 16,
     marginBottom: 4,
   },
-  name: {
+  nameText: {
     fontSize: 24,
     fontWeight: 'bold',
   },
-  profileButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  quickAddContainer: {
+  sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginVertical: 16,
+    alignItems: 'center',
+    marginTop: 24,
+    marginBottom: 16,
   },
-  quickAddButton: {
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  sectionLink: {
+    fontSize: 14,
+  },
+  macroContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  quickActionsContainer: {
+    marginTop: 30,
+    marginBottom: 16,
+  },
+  primaryButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
     borderRadius: 12,
-    flex: 0.48,
+    padding: 16,
+    marginBottom: 12,
   },
-  quickAddIcon: {
-    marginRight: 8,
+  secondaryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
   },
-  quickAddText: {
+  buttonIcon: {
+    marginRight: 10,
+  },
+  primaryButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
   },
-  nutritionSection: {
-    marginTop: 16,
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 16,
-  },
-  nutritionCards: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-  },
-  nutritionCardWrapper: {
-    width: '31%',
-    marginBottom: 12,
-  },
-  quickAccessSection: {
-    marginTop: 16,
-  },
-  quickAccessCards: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  quickAccessCard: {
-    width: '48%',
-    padding: 16,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  quickAccessIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  quickAccessTitle: {
+  secondaryButtonText: {
     fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  quickAccessSubtitle: {
-    fontSize: 14,
+    fontWeight: '600',
   },
 });
 

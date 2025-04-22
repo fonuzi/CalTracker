@@ -1,218 +1,321 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  FlatList, 
-  TouchableOpacity, 
-  ActivityIndicator 
+import React, { useState, useEffect, useContext } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
-import { getFoodLogs, getFoodLogDates } from '../services/StorageService';
-import { Icon } from '../assets/icons';
+import { UserContext } from '../context/UserContext';
+import { getFoodLogs, getFoodLogDates, deleteFoodLog } from '../services/StorageService';
 import FoodItem from '../components/FoodItem';
+import { Icon } from '../assets/icons';
+import * as Animatable from 'react-native-animatable';
 
 const FoodLogScreen = ({ navigation, theme }) => {
+  const { userProfile } = useContext(UserContext);
+  
   // State
-  const [foods, setFoods] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [foodLogs, setFoodLogs] = useState([]);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
-  const [availableDates, setAvailableDates] = useState([]);
+  const [dates, setDates] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [deleting, setDeleting] = useState(false);
   
   // Load food logs for selected date
   useEffect(() => {
-    loadFoods();
+    const loadFoodLogs = async () => {
+      try {
+        setLoading(true);
+        const logs = await getFoodLogs(selectedDate);
+        setFoodLogs(logs);
+      } catch (error) {
+        console.error('Error loading food logs:', error);
+        Alert.alert('Error', 'Failed to load food logs. Please try again.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    
+    loadFoodLogs();
   }, [selectedDate]);
   
   // Load available dates
   useEffect(() => {
-    loadAvailableDates();
-  }, []);
-  
-  // Load foods for the selected date
-  const loadFoods = async () => {
-    try {
-      setIsLoading(true);
-      const foodLogs = await getFoodLogs(selectedDate);
-      setFoods(foodLogs);
-    } catch (error) {
-      console.error('Error loading food logs:', error);
-      setFoods([]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-  
-  // Load dates that have food logs
-  const loadAvailableDates = async () => {
-    try {
-      const dates = await getFoodLogDates();
-      setAvailableDates(dates);
-      
-      // If no dates available, use today's date
-      if (dates.length === 0) {
+    const loadDates = async () => {
+      try {
+        const availableDates = await getFoodLogDates();
+        
+        // Make sure today's date is included
         const today = new Date().toISOString().split('T')[0];
-        setAvailableDates([today]);
+        if (!availableDates.includes(today)) {
+          availableDates.push(today);
+        }
+        
+        // Sort dates in descending order (newest first)
+        availableDates.sort((a, b) => new Date(b) - new Date(a));
+        
+        setDates(availableDates);
+      } catch (error) {
+        console.error('Error loading food log dates:', error);
       }
-    } catch (error) {
-      console.error('Error loading available dates:', error);
-    }
+    };
+    
+    loadDates();
+    
+    // Refresh dates when screen is focused
+    const unsubscribe = navigation.addListener('focus', loadDates);
+    return unsubscribe;
+  }, [navigation]);
+  
+  // Handle editing a food item
+  const handleEditFood = (food) => {
+    // Navigate to the food editing screen
+    navigation.navigate('Edit Food', { food });
   };
   
-  // Navigate to previous date
-  const goToPreviousDate = () => {
-    const currentIndex = availableDates.indexOf(selectedDate);
-    if (currentIndex > 0) {
-      setSelectedDate(availableDates[currentIndex - 1]);
-    }
+  // Handle deleting a food item
+  const handleDeleteFood = (food) => {
+    Alert.alert(
+      'Delete Food',
+      `Are you sure you want to delete "${food.name}"?`,
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setDeleting(true);
+              await deleteFoodLog(food.id);
+              
+              // Update the food logs
+              const updatedLogs = foodLogs.filter((log) => log.id !== food.id);
+              setFoodLogs(updatedLogs);
+            } catch (error) {
+              console.error('Error deleting food log:', error);
+              Alert.alert('Error', 'Failed to delete food log. Please try again.');
+            } finally {
+              setDeleting(false);
+            }
+          },
+        },
+      ]
+    );
   };
   
-  // Navigate to next date
-  const goToNextDate = () => {
-    const currentIndex = availableDates.indexOf(selectedDate);
-    if (currentIndex < availableDates.length - 1) {
-      setSelectedDate(availableDates[currentIndex + 1]);
-    }
+  // Calculate total daily nutrients
+  const calculateTotalNutrients = () => {
+    return foodLogs.reduce(
+      (total, food) => {
+        return {
+          calories: total.calories + (food.calories || 0),
+          protein: total.protein + (food.protein || 0),
+          carbs: total.carbs + (food.carbs || 0),
+          fat: total.fat + (food.fat || 0),
+        };
+      },
+      { calories: 0, protein: 0, carbs: 0, fat: 0 }
+    );
   };
   
-  // Format date for display (e.g., "Monday, Jan 15")
+  // Format date for display
   const formatDate = (dateString) => {
     const date = new Date(dateString);
-    const options = { weekday: 'long', month: 'short', day: 'numeric' };
-    return date.toLocaleDateString('en-US', options);
-  };
-  
-  // Check if date is today
-  const isToday = (dateString) => {
-    const today = new Date().toISOString().split('T')[0];
-    return dateString === today;
-  };
-  
-  // Calculate total calories for the day
-  const calculateTotalCalories = () => {
-    return foods.reduce((total, food) => total + (food.calories || 0), 0);
-  };
-  
-  // Render empty state
-  const renderEmptyState = () => {
-    return (
-      <View style={styles.emptyContainer}>
-        <Icon name="book-open" size={50} color={theme.colors.secondaryText} />
-        <Text style={[styles.emptyText, { color: theme.colors.secondaryText }]}>
-          No food logged for this day
-        </Text>
-        <TouchableOpacity
-          style={[styles.addButton, { backgroundColor: theme.colors.primary }]}
-          onPress={() => navigation.navigate('Camera')}
-        >
-          <Icon name="plus" size={20} color="#FFFFFF" />
-          <Text style={styles.addButtonText}>Add Food</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  };
-  
-  // Render header with date and navigation
-  const renderHeader = () => {
-    return (
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.dateNavButton}
-          onPress={goToPreviousDate}
-          disabled={availableDates.indexOf(selectedDate) === 0}
-        >
-          <Icon 
-            name="chevron-left" 
-            size={24} 
-            color={availableDates.indexOf(selectedDate) === 0 
-              ? theme.colors.disabled 
-              : theme.colors.text} 
-          />
-        </TouchableOpacity>
-        
-        <View style={styles.dateContainer}>
-          <Text style={[styles.dateText, { color: theme.colors.text }]}>
-            {formatDate(selectedDate)}
-          </Text>
-          {isToday(selectedDate) && (
-            <View style={[styles.todayBadge, { backgroundColor: theme.colors.primary }]}>
-              <Text style={styles.todayText}>TODAY</Text>
-            </View>
-          )}
-        </View>
-        
-        <TouchableOpacity
-          style={styles.dateNavButton}
-          onPress={goToNextDate}
-          disabled={availableDates.indexOf(selectedDate) === availableDates.length - 1}
-        >
-          <Icon 
-            name="chevron-right" 
-            size={24} 
-            color={availableDates.indexOf(selectedDate) === availableDates.length - 1 
-              ? theme.colors.disabled 
-              : theme.colors.text} 
-          />
-        </TouchableOpacity>
-      </View>
-    );
-  };
-  
-  // Render total calories for the day
-  const renderTotalCalories = () => {
-    if (foods.length === 0) return null;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
     
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    
+    if (date.toDateString() === today.toDateString()) {
+      return 'Today';
+    } else if (date.toDateString() === yesterday.toDateString()) {
+      return 'Yesterday';
+    } else {
+      return date.toLocaleDateString('en-US', {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+      });
+    }
+  };
+  
+  // Add food button
+  const AddFoodButton = () => (
+    <TouchableOpacity
+      style={[styles.addButton, { backgroundColor: theme.colors.primary }]}
+      onPress={() => navigation.navigate('Camera')}
+    >
+      <Icon name="plus" size={24} color="#FFFFFF" />
+    </TouchableOpacity>
+  );
+  
+  // Total nutrients
+  const totalNutrients = calculateTotalNutrients();
+  
+  // Empty state
+  const EmptyState = () => (
+    <Animatable.View
+      animation="fadeIn"
+      duration={500}
+      style={styles.emptyStateContainer}
+    >
+      <Icon name="book" size={64} color={theme.colors.border} style={styles.emptyStateIcon} />
+      <Text style={[styles.emptyStateTitle, { color: theme.colors.text }]}>
+        No Food Logged Today
+      </Text>
+      <Text style={[styles.emptyStateText, { color: theme.colors.secondaryText }]}>
+        Start tracking your meals to see your nutrition data
+      </Text>
+      <TouchableOpacity
+        style={[styles.emptyStateButton, { backgroundColor: theme.colors.primary }]}
+        onPress={() => navigation.navigate('Camera')}
+      >
+        <Icon name="camera" size={18} color="#FFFFFF" style={styles.emptyStateButtonIcon} />
+        <Text style={styles.emptyStateButtonText}>Add Food</Text>
+      </TouchableOpacity>
+    </Animatable.View>
+  );
+  
+  // Loading indicator
+  if (loading) {
     return (
-      <View style={[styles.totalContainer, { backgroundColor: theme.colors.surface }]}>
-        <Text style={[styles.totalLabel, { color: theme.colors.secondaryText }]}>
-          Total Calories
-        </Text>
-        <Text style={[styles.totalCalories, { color: theme.colors.text }]}>
-          {calculateTotalCalories()} kcal
-        </Text>
+      <View style={[styles.loadingContainer, { backgroundColor: theme.colors.background }]}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
       </View>
     );
-  };
+  }
   
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-      {/* Date selector header */}
-      <View style={[styles.headerContainer, { backgroundColor: theme.colors.surface }]}>
-        {renderHeader()}
+      {/* Header */}
+      <View style={styles.headerContainer}>
+        <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
+          Food Log
+        </Text>
       </View>
       
-      {/* Food log list */}
-      {isLoading ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={theme.colors.primary} />
-        </View>
-      ) : (
-        <>
-          {renderTotalCalories()}
-          
-          <FlatList
-            data={foods}
-            keyExtractor={(item) => item.id}
-            renderItem={({ item }) => (
-              <FoodItem 
-                food={item} 
-                theme={theme}
-                onPress={() => {/* Navigate to food details */}}
-                onDelete={() => {/* Delete food */}}
-              />
-            )}
-            ListEmptyComponent={renderEmptyState}
-            contentContainerStyle={styles.listContent}
-          />
-          
-          {foods.length > 0 && (
+      {/* Date selector */}
+      <View style={styles.dateContainer}>
+        <FlatList
+          horizontal
+          data={dates}
+          keyExtractor={(item) => item}
+          showsHorizontalScrollIndicator={false}
+          renderItem={({ item }) => (
             <TouchableOpacity
-              style={[styles.floatingButton, { backgroundColor: theme.colors.primary }]}
-              onPress={() => navigation.navigate('Camera')}
+              style={[
+                styles.dateButton,
+                {
+                  backgroundColor:
+                    item === selectedDate
+                      ? theme.colors.primary
+                      : theme.colors.surface,
+                  borderColor:
+                    item === selectedDate
+                      ? theme.colors.primary
+                      : theme.colors.border,
+                },
+              ]}
+              onPress={() => setSelectedDate(item)}
             >
-              <Icon name="plus" size={24} color="#FFFFFF" />
+              <Text
+                style={[
+                  styles.dateText,
+                  {
+                    color:
+                      item === selectedDate
+                        ? '#FFFFFF'
+                        : theme.colors.text,
+                  },
+                ]}
+              >
+                {formatDate(item)}
+              </Text>
             </TouchableOpacity>
           )}
-        </>
+          contentContainerStyle={styles.dateList}
+        />
+      </View>
+      
+      {/* Summary card */}
+      <View style={[styles.summaryCard, { backgroundColor: theme.colors.surface }]}>
+        <Text style={[styles.summaryTitle, { color: theme.colors.text }]}>
+          Day Summary
+        </Text>
+        <View style={styles.summaryRow}>
+          <View style={styles.summaryItem}>
+            <Text style={[styles.summaryValue, { color: theme.colors.text }]}>
+              {Math.round(totalNutrients.calories)}
+            </Text>
+            <Text style={[styles.summaryLabel, { color: theme.colors.secondaryText }]}>
+              Calories
+            </Text>
+          </View>
+          <View style={styles.summaryItem}>
+            <Text style={[styles.summaryValue, { color: theme.colors.text }]}>
+              {Math.round(totalNutrients.protein)}g
+            </Text>
+            <Text style={[styles.summaryLabel, { color: theme.colors.secondaryText }]}>
+              Protein
+            </Text>
+          </View>
+          <View style={styles.summaryItem}>
+            <Text style={[styles.summaryValue, { color: theme.colors.text }]}>
+              {Math.round(totalNutrients.carbs)}g
+            </Text>
+            <Text style={[styles.summaryLabel, { color: theme.colors.secondaryText }]}>
+              Carbs
+            </Text>
+          </View>
+          <View style={styles.summaryItem}>
+            <Text style={[styles.summaryValue, { color: theme.colors.text }]}>
+              {Math.round(totalNutrients.fat)}g
+            </Text>
+            <Text style={[styles.summaryLabel, { color: theme.colors.secondaryText }]}>
+              Fat
+            </Text>
+          </View>
+        </View>
+      </View>
+      
+      {/* Food list */}
+      <View style={styles.foodListContainer}>
+        {foodLogs.length > 0 ? (
+          <FlatList
+            data={foodLogs}
+            keyExtractor={(item) => item.id}
+            renderItem={({ item }) => (
+              <Animatable.View animation="fadeIn" duration={500}>
+                <FoodItem
+                  food={item}
+                  onPress={handleEditFood}
+                  onDelete={handleDeleteFood}
+                  theme={theme}
+                />
+              </Animatable.View>
+            )}
+            contentContainerStyle={styles.foodList}
+          />
+        ) : (
+          <EmptyState />
+        )}
+      </View>
+      
+      {/* Add food button */}
+      <AddFoodButton />
+      
+      {/* Overlay when deleting */}
+      {deleting && (
+        <View style={styles.deletingOverlay}>
+          <ActivityIndicator size="large" color={theme.colors.primary} />
+        </View>
       )}
     </View>
   );
@@ -223,112 +326,122 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerContainer: {
-    paddingTop: 60,
-    paddingBottom: 16,
-    borderBottomLeftRadius: 16,
-    borderBottomRightRadius: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
     paddingHorizontal: 16,
+    paddingVertical: 12,
   },
-  dateNavButton: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
+  headerTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
   },
   dateContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    marginVertical: 8,
+  },
+  dateList: {
+    paddingHorizontal: 16,
+  },
+  dateButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    marginRight: 10,
+    borderWidth: 1,
   },
   dateText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginRight: 8,
+    fontSize: 14,
+    fontWeight: '500',
   },
-  todayBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
+  summaryCard: {
+    margin: 16,
+    borderRadius: 16,
+    padding: 16,
   },
-  todayText: {
-    color: '#FFFFFF',
-    fontSize: 10,
+  summaryTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 12,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  summaryItem: {
+    alignItems: 'center',
+  },
+  summaryValue: {
+    fontSize: 16,
     fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  summaryLabel: {
+    fontSize: 12,
+  },
+  foodListContainer: {
+    flex: 1,
+  },
+  foodList: {
+    padding: 16,
+    paddingBottom: 80,
   },
   loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  listContent: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 100,
-    flexGrow: 1,
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingTop: 100,
-  },
-  emptyText: {
-    fontSize: 16,
-    marginTop: 16,
-    marginBottom: 24,
-  },
   addButton: {
-    flexDirection: 'row',
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  addButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '500',
-    marginLeft: 8,
-  },
-  totalContainer: {
-    marginHorizontal: 16,
-    marginTop: 16,
-    padding: 16,
-    borderRadius: 12,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  totalLabel: {
-    fontSize: 16,
-  },
-  totalCalories: {
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  floatingButton: {
     position: 'absolute',
-    bottom: 24,
-    right: 24,
+    bottom: 20,
+    right: 20,
     width: 56,
     height: 56,
     borderRadius: 28,
     justifyContent: 'center',
     alignItems: 'center',
+    elevation: 5,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 3,
-    elevation: 5,
+  },
+  deletingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyStateContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 32,
+  },
+  emptyStateIcon: {
+    marginBottom: 20,
+  },
+  emptyStateTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  emptyStateText: {
+    fontSize: 14,
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  emptyStateButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 30,
+  },
+  emptyStateButtonIcon: {
+    marginRight: 8,
+  },
+  emptyStateButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 

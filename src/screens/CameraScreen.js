@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,152 +7,184 @@ import {
   TextInput,
   ActivityIndicator,
   ScrollView,
-  KeyboardAvoidingView,
+  Alert,
   Platform,
-  Image
 } from 'react-native';
 import { Camera } from 'expo-camera';
 import * as ImagePicker from 'expo-image-picker';
 import { Icon } from '../assets/icons';
+import * as Animatable from 'react-native-animatable';
 import { analyzeFoodImage, analyzeFoodText } from '../services/OpenAIService';
-import FoodAnalysisResult from '../components/FoodAnalysisResult';
 import { saveFoodLog } from '../services/StorageService';
+import FoodAnalysisResult from '../components/FoodAnalysisResult';
 import { suggestMealTypeByTime } from '../utils/foodAnalysis';
 
 const CameraScreen = ({ navigation, theme }) => {
-  // State for camera and permissions
+  // Camera/permission state
   const [hasPermission, setHasPermission] = useState(null);
   const [cameraType, setCameraType] = useState(Camera.Constants.Type.back);
-  const [capturedImage, setCapturedImage] = useState(null);
-  
-  // State for food analysis
-  const [foodDescription, setFoodDescription] = useState('');
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [analysisResult, setAnalysisResult] = useState(null);
-  const [activeTab, setActiveTab] = useState('camera'); // 'camera' or 'text'
-  
-  // Camera reference
   const cameraRef = useRef(null);
+  
+  // UI state
+  const [mode, setMode] = useState('camera'); // 'camera', 'text', 'result'
+  const [loading, setLoading] = useState(false);
+  const [textInput, setTextInput] = useState('');
+  
+  // Result state
+  const [foodData, setFoodData] = useState(null);
   
   // Request camera permissions on mount
   useEffect(() => {
     (async () => {
+      if (Platform.OS === 'web') {
+        setHasPermission(true);
+        // On web, default to text input mode since camera access might be limited
+        setMode('text');
+        return;
+      }
+      
       const { status } = await Camera.requestCameraPermissionsAsync();
       setHasPermission(status === 'granted');
     })();
   }, []);
   
-  // Handle image capture
+  // Take picture handler
   const takePicture = async () => {
     if (cameraRef.current) {
       try {
-        const photo = await cameraRef.current.takePictureAsync();
-        setCapturedImage(photo.uri);
-        await analyzeFood(photo.uri);
+        setLoading(true);
+        
+        const photo = await cameraRef.current.takePictureAsync({
+          quality: 0.7,
+          base64: true,
+        });
+        
+        // Analyze food image
+        await analyzeFood('image', photo.uri);
       } catch (error) {
         console.error('Error taking picture:', error);
+        Alert.alert('Error', 'Failed to capture image. Please try again.');
+        setLoading(false);
       }
     }
   };
   
-  // Handle gallery image selection
+  // Select image from gallery
   const pickImage = async () => {
     try {
+      setLoading(true);
+      
+      // Request permissions if needed
+      if (Platform.OS !== 'web') {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        
+        if (status !== 'granted') {
+          Alert.alert('Permission Required', 'Sorry, we need camera roll permissions to make this work!');
+          setLoading(false);
+          return;
+        }
+      }
+      
+      // Launch image picker
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [4, 3],
-        quality: 1,
+        quality: 0.7,
       });
       
       if (!result.canceled && result.assets && result.assets.length > 0) {
-        setCapturedImage(result.assets[0].uri);
-        await analyzeFood(result.assets[0].uri);
+        // Analyze food image
+        await analyzeFood('image', result.assets[0].uri);
+      } else {
+        setLoading(false);
       }
     } catch (error) {
       console.error('Error picking image:', error);
+      Alert.alert('Error', 'Failed to select image. Please try again.');
+      setLoading(false);
     }
   };
   
-  // Analyze food from image
-  const analyzeFood = async (imageUri) => {
-    try {
-      setIsAnalyzing(true);
-      
-      // Call OpenAI API to analyze food from image
-      const result = await analyzeFoodImage(imageUri);
-      
-      // Set result and clear loading state
-      setAnalysisResult(result);
-    } catch (error) {
-      console.error('Error analyzing food:', error);
-    } finally {
-      setIsAnalyzing(false);
+  // Submit text description
+  const analyzeTextInput = async () => {
+    if (!textInput.trim()) {
+      Alert.alert('Error', 'Please enter a food description.');
+      return;
     }
-  };
-  
-  // Analyze food from text description
-  const analyzeFoodFromText = async () => {
-    if (!foodDescription) return;
     
     try {
-      setIsAnalyzing(true);
-      
-      // Call OpenAI API to analyze food from text
-      const result = await analyzeFoodText(foodDescription);
-      
-      // Set result and clear loading state
-      setAnalysisResult(result);
+      setLoading(true);
+      await analyzeFood('text', textInput);
     } catch (error) {
-      console.error('Error analyzing food from text:', error);
-    } finally {
-      setIsAnalyzing(false);
+      console.error('Error analyzing text:', error);
+      Alert.alert('Error', 'Failed to analyze text. Please try again.');
+      setLoading(false);
     }
   };
   
-  // Save food to log
-  const saveFood = async (food) => {
+  // Analyze food (image or text)
+  const analyzeFood = async (method, input) => {
     try {
-      // Make sure food has a date
-      if (!food.date) {
-        food.date = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+      // Call appropriate analysis method
+      const result = method === 'image'
+        ? await analyzeFoodImage(input)
+        : await analyzeFoodText(input);
+      
+      // Set food data and show result
+      setFoodData(result);
+      setMode('result');
+    } catch (error) {
+      console.error(`Error analyzing food ${method}:`, error);
+      Alert.alert('Error', `Failed to analyze food ${method}. Please try again.`);
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // Save food data to log
+  const handleSaveFood = async (adjustedData) => {
+    try {
+      setLoading(true);
+      
+      // Use adjusted data if provided, otherwise use the original
+      const dataToSave = adjustedData || foodData;
+      
+      // Make sure we have a timestamp and meal type
+      if (!dataToSave.timestamp) {
+        dataToSave.timestamp = new Date().toISOString();
       }
       
-      // Set meal type if not present
-      if (!food.mealType) {
-        food.mealType = suggestMealTypeByTime();
+      if (!dataToSave.mealType) {
+        dataToSave.mealType = suggestMealTypeByTime();
       }
       
       // Save to storage
-      await saveFoodLog(food);
-      
-      // Clear states
-      setAnalysisResult(null);
-      setCapturedImage(null);
-      setFoodDescription('');
+      await saveFoodLog(dataToSave);
       
       // Navigate to food log
       navigation.navigate('Food Log');
     } catch (error) {
-      console.error('Error saving food:', error);
+      console.error('Error saving food data:', error);
+      Alert.alert('Error', 'Failed to save food data. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
   
-  // Handle adjustment of analysis
-  const adjustAnalysis = () => {
-    // Navigate to adjustment screen or show modal (for now, just clear result)
-    setAnalysisResult(null);
+  // Cancel and go back to camera/text input
+  const handleCancel = () => {
+    setFoodData(null);
+    setMode(Platform.OS === 'web' ? 'text' : 'camera');
   };
   
-  // Reset states
-  const resetAnalysis = () => {
-    setAnalysisResult(null);
-    setCapturedImage(null);
-    setFoodDescription('');
+  // Toggle between camera and text input
+  const toggleMode = () => {
+    setMode(mode === 'camera' ? 'text' : 'camera');
   };
   
-  // Toggle camera type
-  const toggleCameraType = () => {
+  // Flip camera
+  const flipCamera = () => {
     setCameraType(
       cameraType === Camera.Constants.Type.back
         ? Camera.Constants.Type.front
@@ -160,219 +192,238 @@ const CameraScreen = ({ navigation, theme }) => {
     );
   };
   
-  // Switch between camera and text input
-  const switchToTab = (tab) => {
-    setActiveTab(tab);
-    resetAnalysis();
-  };
-  
-  // Render camera view
-  const renderCamera = () => {
-    if (hasPermission === null) {
-      return (
-        <View style={styles.cameraContainer}>
-          <Text style={[styles.permissionText, { color: theme.colors.text }]}>
-            Requesting camera permission...
-          </Text>
-        </View>
-      );
-    }
-    
-    if (hasPermission === false) {
-      return (
-        <View style={styles.cameraContainer}>
-          <Text style={[styles.permissionText, { color: theme.colors.text }]}>
-            Camera access denied. Please enable camera permissions to use this feature.
-          </Text>
-          <TouchableOpacity
-            style={[styles.button, { backgroundColor: theme.colors.primary }]}
-            onPress={pickImage}
-          >
-            <Text style={styles.buttonText}>Select from Gallery</Text>
-          </TouchableOpacity>
-        </View>
-      );
-    }
-    
-    if (capturedImage) {
-      return (
-        <View style={styles.cameraContainer}>
-          <Image 
-            source={{ uri: capturedImage }} 
-            style={styles.capturedImage}
-          />
-        </View>
-      );
-    }
-    
+  // Loading indicator
+  if (loading) {
     return (
-      <View style={styles.cameraContainer}>
-        <Camera
-          ref={cameraRef}
-          style={styles.camera}
-          type={cameraType}
-          ratio="4:3"
+      <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+        <Text
+          style={[
+            styles.loadingText,
+            { color: theme.colors.text, marginTop: 20 },
+          ]}
         >
-          <View style={styles.controlsContainer}>
-            <TouchableOpacity 
-              style={styles.cameraControl}
-              onPress={toggleCameraType}
-            >
-              <Icon name="refresh-cw" size={24} color="#FFFFFF" />
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.captureButton}
-              onPress={takePicture}
-            >
-              <View style={styles.captureCircle} />
-            </TouchableOpacity>
-            
-            <TouchableOpacity 
-              style={styles.cameraControl}
-              onPress={pickImage}
-            >
-              <Icon name="image" size={24} color="#FFFFFF" />
-            </TouchableOpacity>
-          </View>
-        </Camera>
-      </View>
-    );
-  };
-  
-  // Render text input view
-  const renderTextInput = () => {
-    return (
-      <View style={styles.textInputContainer}>
-        <Text style={[styles.textInputLabel, { color: theme.colors.text }]}>
-          Describe the food you ate
+          {mode === 'result' ? 'Saving...' : 'Analyzing...'}
         </Text>
-        <TextInput
-          style={[
-            styles.textInput,
-            { 
-              color: theme.colors.text,
-              backgroundColor: theme.colors.surfaceHighlight,
-              borderColor: theme.colors.border
-            }
-          ]}
-          placeholder="E.g., Grilled chicken salad with olive oil dressing and avocado"
-          placeholderTextColor={theme.colors.placeholder}
-          value={foodDescription}
-          onChangeText={setFoodDescription}
-          multiline
-          numberOfLines={4}
-        />
+      </View>
+    );
+  }
+  
+  // Camera permission not granted
+  if (hasPermission === false && mode === 'camera') {
+    return (
+      <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+        <Text style={[styles.permissionText, { color: theme.colors.text }]}>
+          No access to camera
+        </Text>
         <TouchableOpacity
           style={[
-            styles.analyzeButton,
-            { 
-              backgroundColor: theme.colors.primary,
-              opacity: foodDescription ? 1 : 0.5 
-            }
+            styles.permissionButton,
+            { backgroundColor: theme.colors.primary },
           ]}
-          onPress={analyzeFoodFromText}
-          disabled={!foodDescription || isAnalyzing}
+          onPress={() => setMode('text')}
         >
-          {isAnalyzing ? (
-            <ActivityIndicator color="#FFFFFF" />
-          ) : (
-            <>
-              <Icon name="search" size={20} color="#FFFFFF" style={styles.analyzeIcon} />
-              <Text style={styles.analyzeButtonText}>
-                Analyze Food
-              </Text>
-            </>
-          )}
+          <Text style={styles.permissionButtonText}>
+            Use Text Input Instead
+          </Text>
         </TouchableOpacity>
       </View>
     );
-  };
+  }
   
-  return (
-    <KeyboardAvoidingView
-      style={[styles.container, { backgroundColor: theme.colors.background }]}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
-    >
-      {/* Tab selector */}
-      <View style={styles.tabContainer}>
-        <TouchableOpacity
-          style={[
-            styles.tab,
-            activeTab === 'camera' && { borderBottomColor: theme.colors.primary, borderBottomWidth: 2 }
-          ]}
-          onPress={() => switchToTab('camera')}
-        >
-          <Icon
-            name="camera"
-            size={20}
-            color={activeTab === 'camera' ? theme.colors.primary : theme.colors.secondaryText}
-            style={styles.tabIcon}
-          />
-          <Text
-            style={[
-              styles.tabText,
-              { color: activeTab === 'camera' ? theme.colors.primary : theme.colors.secondaryText }
-            ]}
-          >
-            Camera
-          </Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity
-          style={[
-            styles.tab,
-            activeTab === 'text' && { borderBottomColor: theme.colors.primary, borderBottomWidth: 2 }
-          ]}
-          onPress={() => switchToTab('text')}
-        >
-          <Icon
-            name="edit-3"
-            size={20}
-            color={activeTab === 'text' ? theme.colors.primary : theme.colors.secondaryText}
-            style={styles.tabIcon}
-          />
-          <Text
-            style={[
-              styles.tabText,
-              { color: activeTab === 'text' ? theme.colors.primary : theme.colors.secondaryText }
-            ]}
-          >
-            Text
-          </Text>
-        </TouchableOpacity>
+  // Results screen
+  if (mode === 'result' && foodData) {
+    return (
+      <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+        <FoodAnalysisResult
+          foodData={foodData}
+          onSave={handleSaveFood}
+          onCancel={handleCancel}
+          theme={theme}
+        />
       </View>
-      
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-      >
-        {/* Content based on active tab and analysis state */}
-        {analysisResult ? (
-          <FoodAnalysisResult
-            foodData={analysisResult}
-            onSave={saveFood}
-            onAdjust={adjustAnalysis}
-            onCancel={resetAnalysis}
-            theme={theme}
-          />
-        ) : (
-          <>
-            {activeTab === 'camera' ? renderCamera() : renderTextInput()}
+    );
+  }
+  
+  // Text input mode
+  if (mode === 'text') {
+    return (
+      <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
+        <View style={styles.headerContainer}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Icon name="arrow-left" size={24} color={theme.colors.text} />
+          </TouchableOpacity>
+          <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
+            Describe Your Food
+          </Text>
+          {Platform.OS !== 'web' && (
+            <TouchableOpacity style={styles.toggleButton} onPress={toggleMode}>
+              <Icon name="camera" size={24} color={theme.colors.primary} />
+            </TouchableOpacity>
+          )}
+        </View>
+        
+        <ScrollView
+          style={styles.textContainer}
+          contentContainerStyle={styles.textContentContainer}
+          keyboardShouldPersistTaps="handled"
+        >
+          <Animatable.View animation="fadeIn" duration={500}>
+            <Text style={[styles.textTitle, { color: theme.colors.text }]}>
+              What did you eat?
+            </Text>
+            <Text
+              style={[
+                styles.textDescription,
+                { color: theme.colors.secondaryText },
+              ]}
+            >
+              Describe your meal in detail for the most accurate analysis
+            </Text>
             
-            {isAnalyzing && (
-              <View style={styles.analyzingContainer}>
-                <ActivityIndicator size="large" color={theme.colors.primary} />
-                <Text style={[styles.analyzingText, { color: theme.colors.text }]}>
-                  Analyzing your food...
+            <TextInput
+              style={[
+                styles.textInput,
+                {
+                  color: theme.colors.text,
+                  backgroundColor: theme.colors.surface,
+                  borderColor: theme.colors.border,
+                },
+              ]}
+              placeholder="e.g. A bowl of oatmeal with banana, blueberries, and a tablespoon of almond butter"
+              placeholderTextColor={theme.colors.placeholder}
+              value={textInput}
+              onChangeText={setTextInput}
+              multiline
+              numberOfLines={5}
+              textAlignVertical="top"
+            />
+            
+            <TouchableOpacity
+              style={[
+                styles.analyzeButton,
+                {
+                  backgroundColor: theme.colors.primary,
+                  opacity: textInput.trim() ? 1 : 0.7,
+                },
+              ]}
+              onPress={analyzeTextInput}
+              disabled={!textInput.trim()}
+            >
+              <Icon name="search" size={20} color="#FFFFFF" style={styles.analyzeButtonIcon} />
+              <Text style={styles.analyzeButtonText}>Analyze Food</Text>
+            </TouchableOpacity>
+            
+            <View style={styles.textTipsContainer}>
+              <Text
+                style={[styles.textTipsTitle, { color: theme.colors.text }]}
+              >
+                Tips for better results:
+              </Text>
+              <View style={styles.textTip}>
+                <Icon name="check" size={16} color={theme.colors.success} style={styles.textTipIcon} />
+                <Text
+                  style={[
+                    styles.textTipText,
+                    { color: theme.colors.secondaryText },
+                  ]}
+                >
+                  Include portion sizes (e.g., 1 cup, 3 oz)
                 </Text>
               </View>
-            )}
-          </>
-        )}
-      </ScrollView>
-    </KeyboardAvoidingView>
+              <View style={styles.textTip}>
+                <Icon name="check" size={16} color={theme.colors.success} style={styles.textTipIcon} />
+                <Text
+                  style={[
+                    styles.textTipText,
+                    { color: theme.colors.secondaryText },
+                  ]}
+                >
+                  Specify cooking methods (e.g., grilled, baked)
+                </Text>
+              </View>
+              <View style={styles.textTip}>
+                <Icon name="check" size={16} color={theme.colors.success} style={styles.textTipIcon} />
+                <Text
+                  style={[
+                    styles.textTipText,
+                    { color: theme.colors.secondaryText },
+                  ]}
+                >
+                  Mention brands for packaged foods
+                </Text>
+              </View>
+            </View>
+          </Animatable.View>
+        </ScrollView>
+      </View>
+    );
+  }
+  
+  // Camera mode
+  return (
+    <View style={styles.container}>
+      {Platform.OS === 'web' ? (
+        // Web doesn't support Camera, so we show a message
+        <View style={[styles.cameraContainer, { backgroundColor: theme.colors.background }]}>
+          <Text style={[styles.webCameraText, { color: theme.colors.text }]}>
+            Camera not available on web
+          </Text>
+          <TouchableOpacity
+            style={[styles.webUploadButton, { backgroundColor: theme.colors.primary }]}
+            onPress={pickImage}
+          >
+            <Icon name="upload" size={24} color="#FFFFFF" style={styles.webUploadIcon} />
+            <Text style={styles.webUploadText}>Upload Image</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        // Native camera view
+        <Camera
+          style={styles.cameraContainer}
+          type={cameraType}
+          ref={cameraRef}
+          ratio="4:3"
+        >
+          <View style={styles.cameraContent}>
+            <View style={styles.cameraHeader}>
+              <TouchableOpacity
+                style={styles.backButton}
+                onPress={() => navigation.goBack()}
+              >
+                <Icon name="arrow-left" size={24} color="#FFFFFF" />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.flipButton} onPress={flipCamera}>
+                <Icon name="refresh-cw" size={24} color="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
+            
+            <View style={styles.cameraFooter}>
+              <TouchableOpacity style={styles.galleryButton} onPress={pickImage}>
+                <Icon name="image" size={30} color="#FFFFFF" />
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={styles.captureButton}
+                onPress={takePicture}
+              >
+                <View style={styles.captureButtonInner} />
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={styles.textModeButton}
+                onPress={toggleMode}
+              >
+                <Icon name="type" size={30} color="#FFFFFF" />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Camera>
+      )}
+    </View>
   );
 };
 
@@ -380,141 +431,173 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-  },
-  tabContainer: {
+  headerContainer: {
     flexDirection: 'row',
-    paddingTop: 60,
-    paddingHorizontal: 16,
-  },
-  tab: {
-    flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: 16,
     paddingVertical: 12,
+    marginTop: Platform.OS === 'ios' ? 40 : 0,
   },
-  tabIcon: {
-    marginRight: 8,
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    flex: 1,
+    textAlign: 'center',
   },
-  tabText: {
-    fontSize: 16,
-    fontWeight: '500',
+  backButton: {
+    padding: 8,
   },
+  toggleButton: {
+    padding: 8,
+  },
+  // Camera mode styles
   cameraContainer: {
     flex: 1,
-    height: 400,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 20,
   },
-  camera: {
-    width: '100%',
-    height: '100%',
-    justifyContent: 'flex-end',
+  cameraContent: {
+    flex: 1,
+    backgroundColor: 'transparent',
+    justifyContent: 'space-between',
   },
-  permissionText: {
-    fontSize: 16,
-    textAlign: 'center',
-    marginHorizontal: 20,
+  cameraHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    padding: 20,
+    marginTop: Platform.OS === 'ios' ? 40 : 0,
   },
-  controlsContainer: {
+  flipButton: {
+    padding: 8,
+  },
+  cameraFooter: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
-    paddingVertical: 20,
-    paddingHorizontal: 20,
+    paddingBottom: 30,
   },
-  cameraControl: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    justifyContent: 'center',
-    alignItems: 'center',
+  galleryButton: {
+    padding: 10,
   },
   captureButton: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
     backgroundColor: 'rgba(255, 255, 255, 0.3)',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  captureCircle: {
-    width: 54,
-    height: 54,
-    borderRadius: 27,
+  captureButtonInner: {
+    width: 70,
+    height: 70,
+    borderRadius: 35,
     backgroundColor: '#FFFFFF',
   },
-  capturedImage: {
-    width: '100%',
-    height: '100%',
-    resizeMode: 'contain',
+  textModeButton: {
+    padding: 10,
   },
-  textInputContainer: {
+  // Text mode styles
+  textContainer: {
+    flex: 1,
+  },
+  textContentContainer: {
     padding: 20,
+    paddingTop: 10,
   },
-  textInputLabel: {
-    fontSize: 18,
+  textTitle: {
+    fontSize: 24,
     fontWeight: 'bold',
-    marginBottom: 12,
+    marginBottom: 10,
+  },
+  textDescription: {
+    fontSize: 16,
+    marginBottom: 24,
   },
   textInput: {
-    height: 120,
     borderWidth: 1,
     borderRadius: 12,
-    padding: 12,
+    padding: 16,
     fontSize: 16,
-    textAlignVertical: 'top',
+    minHeight: 150,
   },
   analyzeButton: {
     flexDirection: 'row',
-    height: 50,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
     borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 16,
-  },
-  analyzeButtonText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-  },
-  analyzeIcon: {
-    marginRight: 8,
-  },
-  analyzingContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1000,
-  },
-  analyzingText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    marginTop: 16,
-  },
-  button: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 8,
     marginTop: 20,
   },
-  buttonText: {
+  analyzeButtonIcon: {
+    marginRight: 10,
+  },
+  analyzeButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
-    fontWeight: '500',
+    fontWeight: '600',
+  },
+  textTipsContainer: {
+    marginTop: 30,
+  },
+  textTipsTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 12,
+  },
+  textTip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  textTipIcon: {
+    marginRight: 10,
+  },
+  textTipText: {
+    fontSize: 14,
+  },
+  // Web camera placeholder
+  webCameraText: {
+    fontSize: 18,
+    textAlign: 'center',
+    marginTop: 100,
+  },
+  webUploadButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+    borderRadius: 12,
+    marginTop: 30,
+    marginHorizontal: 50,
+  },
+  webUploadIcon: {
+    marginRight: 10,
+  },
+  webUploadText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  // Permission styles
+  permissionText: {
+    fontSize: 18,
+    textAlign: 'center',
+    marginTop: 100,
+  },
+  permissionButton: {
+    padding: 16,
+    borderRadius: 12,
+    marginTop: 20,
+    marginHorizontal: 50,
+    alignItems: 'center',
+  },
+  permissionButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  // Loading styles
+  loadingText: {
+    fontSize: 16,
+    textAlign: 'center',
   },
 });
 
