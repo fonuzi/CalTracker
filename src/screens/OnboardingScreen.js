@@ -16,8 +16,10 @@ import { UserContext } from '../context/UserContext';
 import { analyzeFitnessGoals } from '../services/OpenAIService';
 import { calculateBMI, calculateBMR, calculateTDEE, calculateCalorieGoal, calculateMacroGoals, getBMICategory } from '../utils/calculators';
 import * as Animatable from 'react-native-animatable';
+import { useNavigation } from '@react-navigation/native';
 
 const OnboardingScreen = ({ theme }) => {
+  const navigation = useNavigation();
   const { updateUserProfile } = useContext(UserContext);
   const [currentStep, setCurrentStep] = useState(1);
   const [userData, setUserData] = useState({
@@ -549,7 +551,27 @@ const OnboardingScreen = ({ theme }) => {
                   BMI:
                 </Text>
                 <Text style={[styles.profileSummaryValue, { color: theme.colors.text }]}>
-                  {userData.bmi} ({userData.bmiCategory})
+                  {userData.bmi || 0} ({userData.bmiCategory || 'Unknown'})
+                </Text>
+              </View>
+              
+              {/* BMI Category explanation */}
+              <View style={[styles.bmiCategoryContainer, {
+                backgroundColor: userData.bmiCategory === 'Underweight' ? '#FFD166' + '20' :
+                                 userData.bmiCategory === 'Normal' ? '#06D6A0' + '20' :
+                                 userData.bmiCategory === 'Overweight' ? '#FF9F43' + '20' :
+                                 userData.bmiCategory === 'Obese' ? '#FF6B6B' + '20' : 'transparent',
+                borderColor: userData.bmiCategory === 'Underweight' ? '#FFD166' :
+                             userData.bmiCategory === 'Normal' ? '#06D6A0' :
+                             userData.bmiCategory === 'Overweight' ? '#FF9F43' :
+                             userData.bmiCategory === 'Obese' ? '#FF6B6B' : theme.colors.border,
+              }]}>
+                <Text style={[styles.bmiCategoryText, { color: theme.colors.text }]}>
+                  {userData.bmiCategory === 'Underweight' && 'You may need to focus on healthy weight gain through a nutrient-rich diet.'}
+                  {userData.bmiCategory === 'Normal' && 'Your weight is within a healthy range. Focus on maintaining this through balanced nutrition.'}
+                  {userData.bmiCategory === 'Overweight' && 'A moderate calorie deficit combined with regular exercise may help reach a healthier weight.'}
+                  {userData.bmiCategory === 'Obese' && 'Consider consulting a healthcare professional for personalized advice on achieving a healthier weight.'}
+                  {!userData.bmiCategory && 'BMI information not available.'}
                 </Text>
               </View>
             </View>
@@ -615,67 +637,56 @@ const OnboardingScreen = ({ theme }) => {
             <View style={styles.buttonContainer}>
               <TouchableOpacity
                 style={[styles.button, { backgroundColor: theme.colors.primary }]}
-                onPress={() => {
-                  // Create a direct function to handle profile completion and navigation
-                  const completeProfile = async () => {
-                    try {
-                      // Get the user profile directly from the context
-                      const profileJson = JSON.stringify(userData);
-                      
-                      // First save to AsyncStorage to make sure it persists
-                      await AsyncStorage.setItem('user_profile', profileJson);
-                      
-                      // Show confirmation to user
-                      Alert.alert(
-                        "Profile Created",
-                        "Your profile has been created successfully!",
-                        [
-                          { 
-                            text: "Continue to App", 
-                            onPress: () => {
-                              // Use a hard reset approach by clearing AsyncStorage and then 
-                              // immediately setting it again - this forces a state update in App.js
-                              AsyncStorage.removeItem('user_profile')
-                                .then(() => {
-                                  setTimeout(() => {
-                                    AsyncStorage.setItem('user_profile', profileJson)
-                                      .then(() => {
-                                        // Try a few different methods to force navigation
-                                        if (window && window.location) {
-                                          window.location.href = '/';
-                                        } else {
-                                          // For native environments
-                                          try {
-                                            if (Platform.OS === 'web') {
-                                              document.location.reload();
-                                            } else {
-                                              // Last resort - force a complete app reload
-                                              setTimeout(() => {
-                                                window.location.reload();
-                                              }, 500);
-                                            }
-                                          } catch (e) {
-                                            console.error('Navigation error:', e);
-                                          }
-                                        }
-                                      });
-                                  }, 300);
-                                });
-                            }
-                          }
-                        ]
-                      );
-                    } catch (error) {
-                      console.error('Error completing profile:', error);
-                      Alert.alert('Error', 'Failed to save your profile. Please try again.');
+                onPress={async () => {
+                  try {
+                    setLoading(true);
+                    
+                    // Get the user profile directly from the context
+                    const profileJson = JSON.stringify(userData);
+                    
+                    // First save to AsyncStorage to make sure it persists
+                    await AsyncStorage.setItem('user_profile', profileJson);
+                    
+                    // Update the global user context
+                    await updateUserProfile({
+                      ...userData,
+                      onboardingCompleted: true
+                    });
+                    
+                    // Explicitly set onboarding as completed in AsyncStorage
+                    await AsyncStorage.setItem('onboarding_completed', 'true');
+                    
+                    // Use the navigation context to navigate
+                    if (navigation && navigation.reset) {
+                      navigation.reset({
+                        index: 0,
+                        routes: [{ name: 'Main' }],
+                      });
+                    } else {
+                      // Fallback for web or if navigation context isn't available
+                      if (window && window.location) {
+                        window.location.href = '/';
+                      } else if (Platform.OS === 'web') {
+                        document.location.reload();
+                      } else {
+                        // Force the app to reload as last resort
+                        console.log('Using app reload as fallback navigation');
+                        setTimeout(() => {
+                          if (window) window.location.reload();
+                        }, 300);
+                      }
                     }
-                  };
-                  
-                  // Execute the function
-                  completeProfile();
+                  } catch (error) {
+                    console.error('Error completing profile:', error);
+                    Alert.alert('Error', 'Failed to save your profile. Please try again.');
+                  } finally {
+                    setLoading(false);
+                  }
                 }}
               >
-                <Text style={styles.buttonText}>Get Started</Text>
+                <Text style={styles.buttonText}>
+                  {loading ? 'Saving...' : 'Get Started'}
+                </Text>
               </TouchableOpacity>
             </View>
           </Animatable.View>
@@ -822,6 +833,17 @@ const styles = StyleSheet.create({
   restrictionLabel: {
     fontSize: 14,
     fontWeight: '500',
+  },
+  bmiCategoryContainer: {
+    padding: 15,
+    borderRadius: 8,
+    borderWidth: 1,
+    marginTop: 10,
+    marginBottom: 20,
+  },
+  bmiCategoryText: {
+    fontSize: 14,
+    lineHeight: 20,
   },
   buttonContainer: {
     flexDirection: 'row',
