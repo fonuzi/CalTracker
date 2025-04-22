@@ -1,4 +1,4 @@
-import React, { useState, useContext } from 'react';
+import React, { useState, useContext, useEffect } from 'react';
 import { 
   View, 
   Text, 
@@ -7,11 +7,12 @@ import {
   TouchableOpacity, 
   TextInput,
   KeyboardAvoidingView,
-  Platform
+  Platform,
+  Switch
 } from 'react-native';
 import { UserContext } from '../context/UserContext';
 import { analyzeFitnessGoals } from '../services/OpenAIService';
-import { calculateBMI, calculateBMR, calculateTDEE, calculateCalorieGoal, calculateMacroGoals } from '../utils/calculators';
+import { calculateBMI, calculateBMR, calculateTDEE, calculateCalorieGoal, calculateMacroGoals, getBMICategory } from '../utils/calculators';
 import * as Animatable from 'react-native-animatable';
 
 const OnboardingScreen = ({ theme }) => {
@@ -25,10 +26,60 @@ const OnboardingScreen = ({ theme }) => {
     height: '',
     activityLevel: 'moderate',
     fitnessGoal: 'maintain',
-    dietaryRestrictions: []
+    dietaryRestrictions: [],
+    useMetricUnits: true // true for metric (kg/cm), false for imperial (lbs/in)
   });
   const [loading, setLoading] = useState(false);
   const [recommendations, setRecommendations] = useState(null);
+  
+  // Unit conversion functions
+  const lbsToKg = (lbs) => {
+    return (parseFloat(lbs) * 0.45359237).toFixed(1);
+  };
+  
+  const kgToLbs = (kg) => {
+    return (parseFloat(kg) * 2.20462262).toFixed(1);
+  };
+  
+  const inToCm = (inches) => {
+    return (parseFloat(inches) * 2.54).toFixed(1);
+  };
+  
+  const cmToIn = (cm) => {
+    return (parseFloat(cm) / 2.54).toFixed(1);
+  };
+  
+  // Convert values when units are changed
+  const convertValuesOnUnitChange = (useMetric) => {
+    // If no values entered yet, just switch the unit preference
+    if (!userData.weight && !userData.height) {
+      setUserData(prev => ({ ...prev, useMetricUnits: useMetric }));
+      return;
+    }
+    
+    let newWeight = userData.weight;
+    let newHeight = userData.height;
+    
+    if (userData.weight) {
+      newWeight = useMetric ? lbsToKg(userData.weight) : kgToLbs(userData.weight);
+    }
+    
+    if (userData.height) {
+      newHeight = useMetric ? inToCm(userData.height) : cmToIn(userData.height);
+    }
+    
+    setUserData(prev => ({
+      ...prev,
+      useMetricUnits: useMetric,
+      weight: newWeight.toString(),
+      height: newHeight.toString()
+    }));
+  };
+  
+  // Toggle units between metric and imperial
+  const toggleUnits = () => {
+    convertValuesOnUnitChange(!userData.useMetricUnits);
+  };
   
   // Handle input changes
   const handleChange = (field, value) => {
@@ -71,20 +122,31 @@ const OnboardingScreen = ({ theme }) => {
     try {
       setLoading(true);
       
-      // Calculate health metrics
-      const weight = parseFloat(userData.weight);
-      const height = parseFloat(userData.height);
+      // Convert imperial to metric for calculations if needed
+      let weightKg = parseFloat(userData.weight);
+      let heightCm = parseFloat(userData.height);
       
-      const bmi = calculateBMI(weight, height);
-      const bmr = calculateBMR(weight, height, parseInt(userData.age), userData.gender);
+      // If using imperial units, convert to metric for calculations
+      if (!userData.useMetricUnits) {
+        weightKg = parseFloat(lbsToKg(userData.weight));
+        heightCm = parseFloat(inToCm(userData.height));
+      }
+      
+      // Calculate health metrics (our calculator functions expect metric units)
+      const bmi = calculateBMI(weightKg, heightCm);
+      const bmiCategory = getBMICategory(bmi);
+      const bmr = calculateBMR(weightKg, heightCm, parseInt(userData.age), userData.gender);
       const tdee = calculateTDEE(bmr, userData.activityLevel);
       const calorieGoal = calculateCalorieGoal(tdee, userData.fitnessGoal);
-      const macroGoals = calculateMacroGoals(calorieGoal, userData.fitnessGoal, weight);
+      const macroGoals = calculateMacroGoals(calorieGoal, userData.fitnessGoal, weightKg);
       
       // Add health metrics to user data
       const enrichedUserData = {
         ...userData,
+        weightKg,
+        heightCm,
         bmi,
+        bmiCategory: bmiCategory.category,
         bmr,
         tdee,
         calorieGoal,
@@ -264,8 +326,49 @@ const OnboardingScreen = ({ theme }) => {
               Let's get your weight and height to calculate your ideal calorie intake.
             </Text>
             
-            {renderInput('Weight (kg)', 'weight', 'Your weight in kilograms', 'numeric')}
-            {renderInput('Height (cm)', 'height', 'Your height in centimeters', 'numeric')}
+            {/* Units toggle */}
+            <View style={styles.unitsToggleContainer}>
+              <Text style={[styles.unitsToggleLabel, { color: theme.colors.text }]}>
+                Units:
+              </Text>
+              <View style={styles.unitsToggleRow}>
+                <Text style={[styles.unitsLabel, { 
+                  color: userData.useMetricUnits ? theme.colors.primary : theme.colors.secondaryText 
+                }]}>
+                  Metric (kg/cm)
+                </Text>
+                <Switch
+                  value={!userData.useMetricUnits}
+                  onValueChange={toggleUnits}
+                  trackColor={{ 
+                    false: theme.colors.primary + '50', 
+                    true: theme.colors.primary + '50' 
+                  }}
+                  thumbColor={theme.colors.primary}
+                />
+                <Text style={[styles.unitsLabel, { 
+                  color: !userData.useMetricUnits ? theme.colors.primary : theme.colors.secondaryText 
+                }]}>
+                  Imperial (lb/in)
+                </Text>
+              </View>
+            </View>
+            
+            {/* Weight input with dynamic units */}
+            {renderInput(
+              userData.useMetricUnits ? 'Weight (kg)' : 'Weight (lb)', 
+              'weight', 
+              userData.useMetricUnits ? 'Your weight in kilograms' : 'Your weight in pounds', 
+              'numeric'
+            )}
+            
+            {/* Height input with dynamic units */}
+            {renderInput(
+              userData.useMetricUnits ? 'Height (cm)' : 'Height (in)', 
+              'height', 
+              userData.useMetricUnits ? 'Your height in centimeters' : 'Your height in inches', 
+              'numeric'
+            )}
             
             <View style={styles.buttonContainer}>
               <TouchableOpacity
@@ -277,6 +380,7 @@ const OnboardingScreen = ({ theme }) => {
               <TouchableOpacity
                 style={[styles.button, { backgroundColor: theme.colors.primary }]}
                 onPress={nextStep}
+                disabled={!userData.weight || !userData.height}
               >
                 <Text style={styles.buttonText}>Next</Text>
               </TouchableOpacity>
