@@ -134,6 +134,14 @@ const OnboardingScreen = ({ theme }) => {
         heightCm = parseFloat(inToCm(userData.height));
       }
       
+      // Ensure valid numerical values for calculations
+      if (isNaN(weightKg) || isNaN(heightCm) || weightKg <= 0 || heightCm <= 0) {
+        console.error('Invalid weight or height values:', { weightKg, heightCm, rawWeight: userData.weight, rawHeight: userData.height });
+        alert('Please enter valid weight and height values before proceeding.');
+        setLoading(false);
+        return;
+      }
+      
       // Calculate health metrics (our calculator functions expect metric units)
       const bmi = calculateBMI(weightKg, heightCm);
       const bmiCategory = getBMICategory(bmi);

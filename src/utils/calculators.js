@@ -9,10 +9,26 @@
  * @returns {number} BMI value
  */
 export const calculateBMI = (weightKg, heightCm) => {
-  if (!weightKg || !heightCm) return 0;
+  // Check for valid inputs and provide clear error handling
+  if (!weightKg || !heightCm || isNaN(weightKg) || isNaN(heightCm)) {
+    console.warn('Invalid inputs for BMI calculation:', { weightKg, heightCm });
+    return 0;
+  }
   
+  // Ensure inputs are positive numbers
+  if (weightKg <= 0 || heightCm <= 0) {
+    console.warn('Weight and height must be positive values for BMI calculation');
+    return 0;
+  }
+  
+  // Convert height from cm to meters
   const heightM = heightCm / 100;
-  return +(weightKg / (heightM * heightM)).toFixed(1);
+  
+  // BMI formula: weight (kg) / [height (m)]²
+  const bmi = weightKg / (heightM * heightM);
+  
+  // Round to 1 decimal place and ensure it's a number
+  return parseFloat(bmi.toFixed(1));
 };
 
 /**
@@ -41,15 +57,38 @@ export const getBMICategory = (bmi) => {
  * @returns {number} BMR in calories per day
  */
 export const calculateBMR = (weightKg, heightCm, age, gender) => {
-  if (!weightKg || !heightCm || !age || !gender) return 0;
+  // Input validation with better error handling
+  if (!weightKg || !heightCm || !age || !gender) {
+    console.warn('Missing required inputs for BMR calculation', { weightKg, heightCm, age, gender });
+    return 0;
+  }
   
-  // Mifflin-St Jeor Equation
+  // Ensure values are valid numbers
+  if (isNaN(weightKg) || isNaN(heightCm) || isNaN(age)) {
+    console.warn('Non-numeric inputs for BMR calculation', { weightKg, heightCm, age });
+    return 0;
+  }
+  
+  // Ensure positive values
+  if (weightKg <= 0 || heightCm <= 0 || age <= 0) {
+    console.warn('Invalid values (must be positive) for BMR calculation', { weightKg, heightCm, age });
+    return 0;
+  }
+  
+  // Mifflin-St Jeor Equation (more accurate than Harris-Benedict)
   let bmr;
   
   if (gender.toLowerCase() === 'male') {
+    // For men: BMR = (10 × weight in kg) + (6.25 × height in cm) - (5 × age in years) + 5
     bmr = 10 * weightKg + 6.25 * heightCm - 5 * age + 5;
   } else {
+    // For women: BMR = (10 × weight in kg) + (6.25 × height in cm) - (5 × age in years) - 161
     bmr = 10 * weightKg + 6.25 * heightCm - 5 * age - 161;
+  }
+  
+  // Ensure reasonable BMR values (typical range 1000-2500 for most people)
+  if (bmr < 500 || bmr > 5000) {
+    console.warn('BMR calculation resulted in unusual value, possible input error:', { bmr, weightKg, heightCm, age, gender });
   }
   
   return Math.round(bmr);
@@ -62,31 +101,50 @@ export const calculateBMR = (weightKg, heightCm, age, gender) => {
  * @returns {number} TDEE in calories per day
  */
 export const calculateTDEE = (bmr, activityLevel) => {
-  if (!bmr) return 0;
+  // Input validation
+  if (!bmr || isNaN(bmr) || bmr <= 0) {
+    console.warn('Invalid BMR value for TDEE calculation:', bmr);
+    return 0;
+  }
   
+  // Physical Activity Level (PAL) multipliers based on activity level
   let multiplier;
   
   switch (activityLevel) {
     case 'sedentary':
+      // Little or no exercise, desk job
       multiplier = 1.2;
       break;
     case 'light':
+      // Light exercise 1-3 days/week
       multiplier = 1.375;
       break;
     case 'moderate':
+      // Moderate exercise 3-5 days/week
       multiplier = 1.55;
       break;
     case 'active':
+      // Active: heavy exercise 6-7 days/week
       multiplier = 1.725;
       break;
     case 'very_active':
+      // Very active: physical job or twice-daily training
       multiplier = 1.9;
       break;
     default:
+      // If activity level is unknown, default to sedentary to avoid overestimating
+      console.warn('Unknown activity level for TDEE calculation, defaulting to sedentary:', activityLevel);
       multiplier = 1.2;
   }
   
-  return Math.round(bmr * multiplier);
+  const tdee = Math.round(bmr * multiplier);
+  
+  // Sanity check for reasonable TDEE values
+  if (tdee < 1000 || tdee > 4000) {
+    console.warn('TDEE calculation resulted in unusual value, possible input error:', { tdee, bmr, activityLevel });
+  }
+  
+  return tdee;
 };
 
 /**
@@ -96,18 +154,48 @@ export const calculateTDEE = (bmr, activityLevel) => {
  * @returns {number} Daily calorie goal
  */
 export const calculateCalorieGoal = (tdee, fitnessGoal) => {
-  if (!tdee) return 0;
+  // Input validation
+  if (!tdee || isNaN(tdee) || tdee <= 0) {
+    console.warn('Invalid TDEE value for calorie goal calculation:', tdee);
+    return 0;
+  }
+  
+  let calorieGoal;
   
   switch (fitnessGoal) {
     case 'lose':
-      return Math.round(tdee * 0.8); // 20% deficit
+      // For weight loss, a 20% deficit is typically effective and sustainable
+      calorieGoal = Math.round(tdee * 0.8);
+      
+      // Sanity check: don't go below 1200 for most adults (minimum to maintain nutrition)
+      if (calorieGoal < 1200) {
+        console.warn('Calculated calorie goal is too low, setting minimum threshold of 1200:', calorieGoal);
+        calorieGoal = 1200;
+      }
+      break;
+      
     case 'maintain':
-      return tdee;
+      // For maintenance, keep at TDEE
+      calorieGoal = tdee;
+      break;
+      
     case 'gain':
-      return Math.round(tdee * 1.1); // 10% surplus
+      // For weight gain, a 10% surplus is typically effective
+      calorieGoal = Math.round(tdee * 1.1);
+      
+      // Sanity check: upper limit to avoid excessive calorie surplus
+      if (calorieGoal > tdee + 1000) {
+        console.warn('Calculated calorie surplus is too high, limiting to TDEE + 1000:', calorieGoal);
+        calorieGoal = tdee + 1000;
+      }
+      break;
+      
     default:
-      return tdee;
+      console.warn('Unknown fitness goal for calorie calculation, defaulting to maintenance:', fitnessGoal);
+      calorieGoal = tdee;
   }
+  
+  return calorieGoal;
 };
 
 /**
@@ -118,7 +206,9 @@ export const calculateCalorieGoal = (tdee, fitnessGoal) => {
  * @returns {Object} Macronutrient goals in grams
  */
 export const calculateMacroGoals = (calorieGoal, fitnessGoal, weightKg) => {
-  if (!calorieGoal || !weightKg) {
+  // Input validation
+  if (!calorieGoal || !weightKg || isNaN(calorieGoal) || isNaN(weightKg) || calorieGoal <= 0 || weightKg <= 0) {
+    console.warn('Invalid inputs for macro calculation:', { calorieGoal, weightKg });
     return {
       protein: 0,
       carbs: 0,
@@ -126,42 +216,57 @@ export const calculateMacroGoals = (calorieGoal, fitnessGoal, weightKg) => {
     };
   }
   
-  let proteinRatio, carbsRatio, fatRatio;
+  // Use more scientifically-based approach while taking fitness goal into account
+  let proteinPerKg, fatPerCalorie, carbsRemaining;
   
   switch (fitnessGoal) {
     case 'lose':
-      proteinRatio = 0.4; // 40% protein
-      carbsRatio = 0.3;   // 30% carbs
-      fatRatio = 0.3;     // 30% fat
+      // Higher protein for muscle preservation during weight loss
+      // 2.0-2.4g protein per kg bodyweight
+      proteinPerKg = 2.2;
+      // 0.3g fat per calorie (minimum needed for hormone production)
+      fatPerCalorie = 0.3;
       break;
     case 'maintain':
-      proteinRatio = 0.3; // 30% protein
-      carbsRatio = 0.4;   // 40% carbs
-      fatRatio = 0.3;     // 30% fat
+      // 1.6-2.0g protein per kg bodyweight
+      proteinPerKg = 1.8;
+      // 0.3-0.35g fat per calorie
+      fatPerCalorie = 0.35;
       break;
     case 'gain':
-      proteinRatio = 0.3; // 30% protein
-      carbsRatio = 0.45;  // 45% carbs
-      fatRatio = 0.25;    // 25% fat
+      // 1.8-2.2g protein per kg bodyweight
+      proteinPerKg = 2.0;
+      // 0.25-0.3g fat per calorie (more carbs for energy)
+      fatPerCalorie = 0.25;
       break;
     default:
-      proteinRatio = 0.3;
-      carbsRatio = 0.4;
-      fatRatio = 0.3;
+      // Default to maintenance values
+      proteinPerKg = 1.8;
+      fatPerCalorie = 0.35;
   }
   
-  // Calculate grams based on ratios and calorie goal
-  // Protein: 4 calories per gram
-  // Carbs: 4 calories per gram
-  // Fat: 9 calories per gram
-  const proteinCals = calorieGoal * proteinRatio;
-  const carbsCals = calorieGoal * carbsRatio;
-  const fatCals = calorieGoal * fatRatio;
+  // Calculate macros in absolute grams
+  const proteinGrams = Math.round(weightKg * proteinPerKg);
   
+  // Calories from protein (4 cal per gram)
+  const proteinCals = proteinGrams * 4;
+  
+  // Fat calculation
+  // Using percentage of total calories but ensuring it's not too low
+  const minimumFatGrams = Math.round(weightKg * 0.8); // Minimum 0.8g/kg for hormone health
+  const calculatedFatGrams = Math.round((calorieGoal * fatPerCalorie) / 9);
+  const fatGrams = Math.max(minimumFatGrams, calculatedFatGrams);
+  const fatCals = fatGrams * 9;
+  
+  // Remaining calories go to carbs
+  const remainingCals = calorieGoal - proteinCals - fatCals;
+  const carbsGrams = Math.max(0, Math.round(remainingCals / 4));
+  
+  // Ensure we don't have negative values or unrealistic ratios
   return {
-    protein: Math.round(proteinCals / 4),
-    carbs: Math.round(carbsCals / 4),
-    fat: Math.round(fatCals / 9)
+    protein: proteinGrams,
+    carbs: carbsGrams,
+    fat: fatGrams
   };
 };
 
