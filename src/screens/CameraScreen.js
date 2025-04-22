@@ -9,7 +9,8 @@ import {
   Dimensions,
   Image,
   ActivityIndicator,
-  Alert
+  Alert,
+  Platform
 } from 'react-native';
 import { Text, useTheme, Button } from 'react-native-paper';
 import { Camera } from 'expo-camera';
@@ -32,8 +33,8 @@ const CameraScreen = ({ navigation }) => {
   
   // State for camera
   const [hasPermission, setHasPermission] = useState(null);
-  const [type, setType] = useState(Camera.Constants.Type.back);
-  const [flash, setFlash] = useState(Camera.Constants.FlashMode.off);
+  const [type, setType] = useState(Camera?.Constants?.Type?.back || 'back');
+  const [flash, setFlash] = useState(Camera?.Constants?.FlashMode?.off || 'off');
   
   // State for analysis
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -301,6 +302,12 @@ const CameraScreen = ({ navigation }) => {
   
   // Function to toggle camera type (front/back)
   const toggleCameraType = () => {
+    if (!Camera?.Constants?.Type) {
+      // Handle web environment where Camera.Constants might not be available
+      setType(type === 'back' ? 'front' : 'back');
+      return;
+    }
+    
     setType(
       type === Camera.Constants.Type.back
         ? Camera.Constants.Type.front
@@ -310,6 +317,12 @@ const CameraScreen = ({ navigation }) => {
   
   // Function to toggle flash
   const toggleFlash = () => {
+    if (!Camera?.Constants?.FlashMode) {
+      // Handle web environment where Camera.Constants might not be available
+      setFlash(flash === 'off' ? 'on' : 'off');
+      return;
+    }
+    
     setFlash(
       flash === Camera.Constants.FlashMode.off
         ? Camera.Constants.FlashMode.on
@@ -386,62 +399,119 @@ const CameraScreen = ({ navigation }) => {
     );
   }
   
-  // Render the camera screen
+  // Check if we're in a web environment where Camera component doesn't fully work
+  const isWeb = Platform.OS === 'web';
+  
+  // Render the fallback UI for web or the camera screen for native platforms
   return (
-    <View style={styles.container}>
-      <Camera
-        ref={cameraRef}
-        style={styles.camera}
-        type={type}
-        flashMode={flash}
-      >
-        <View style={styles.topControls}>
-          <TouchableOpacity
-            style={styles.controlButton}
-            onPress={() => navigation.goBack()}
-          >
-            <Feather name="x" size={24} color="white" />
-          </TouchableOpacity>
+    <View style={[styles.container, isWeb && { backgroundColor: theme.colors.background }]}>
+      {isWeb ? (
+        // Web fallback UI with photo picker and manual entry options
+        <View style={styles.webFallback}>
+          <View style={styles.topControls}>
+            <TouchableOpacity
+              style={[styles.controlButton, { backgroundColor: theme.colors.primary + '40' }]}
+              onPress={() => navigation.goBack()}
+            >
+              <Feather name="x" size={24} color={theme.colors.text} />
+            </TouchableOpacity>
+          </View>
           
-          <TouchableOpacity
-            style={styles.controlButton}
-            onPress={toggleFlash}
-          >
-            <Feather
-              name={flash === Camera.Constants.FlashMode.on ? "zap" : "zap-off"}
-              size={24}
-              color="white"
-            />
-          </TouchableOpacity>
+          <View style={styles.webFallbackContent}>
+            <Animatable.View 
+              animation="fadeIn" 
+              duration={800}
+              style={styles.webFallbackIconContainer}
+            >
+              <Feather name="camera-off" size={60} color={theme.colors.primary} />
+              <Text style={[styles.webFallbackText, { color: theme.colors.text }]}>
+                Camera is not fully supported in web
+              </Text>
+              <Text style={[styles.webFallbackSubtext, { color: theme.colors.secondaryText }]}>
+                Please use one of these alternatives:
+              </Text>
+            </Animatable.View>
+            
+            <Animatable.View 
+              animation="fadeInUp" 
+              delay={300}
+              duration={800}
+              style={styles.webFallbackButtons}
+            >
+              <TouchableOpacity
+                style={[styles.webFallbackButton, { backgroundColor: theme.colors.primary }]}
+                onPress={pickImage}
+              >
+                <Feather name="image" size={24} color="white" style={styles.webFallbackButtonIcon} />
+                <Text style={styles.webFallbackButtonText}>Upload from Gallery</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={[styles.webFallbackButton, { backgroundColor: theme.colors.surface, borderColor: theme.colors.primary, borderWidth: 1 }]}
+                onPress={() => setShowManualEntry(true)}
+              >
+                <Feather name="edit" size={24} color={theme.colors.primary} style={styles.webFallbackButtonIcon} />
+                <Text style={[styles.webFallbackButtonText, { color: theme.colors.primary }]}>Enter Manually</Text>
+              </TouchableOpacity>
+            </Animatable.View>
+          </View>
         </View>
-        
-        <View style={styles.cameraOverlay}>
-          <View style={styles.targetBox} />
-        </View>
-        
-        <View style={styles.bottomControls}>
-          <TouchableOpacity
-            style={styles.galleryButton}
-            onPress={pickImage}
-          >
-            <Feather name="image" size={24} color="white" />
-          </TouchableOpacity>
+      ) : (
+        // Native camera UI
+        <Camera
+          ref={cameraRef}
+          style={styles.camera}
+          type={type}
+          flashMode={flash}
+        >
+          <View style={styles.topControls}>
+            <TouchableOpacity
+              style={styles.controlButton}
+              onPress={() => navigation.goBack()}
+            >
+              <Feather name="x" size={24} color="white" />
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={styles.controlButton}
+              onPress={toggleFlash}
+            >
+              <Feather
+                name={flash === (Camera?.Constants?.FlashMode?.on || 'on') ? "zap" : "zap-off"}
+                size={24}
+                color="white"
+              />
+            </TouchableOpacity>
+          </View>
           
-          <TouchableOpacity
-            style={styles.captureButton}
-            onPress={takePicture}
-          >
-            <View style={styles.captureButtonInner} />
-          </TouchableOpacity>
+          <View style={styles.cameraOverlay}>
+            <View style={styles.targetBox} />
+          </View>
           
-          <TouchableOpacity
-            style={styles.manualButton}
-            onPress={() => setShowManualEntry(true)}
-          >
-            <Feather name="edit" size={24} color="white" />
-          </TouchableOpacity>
-        </View>
-      </Camera>
+          <View style={styles.bottomControls}>
+            <TouchableOpacity
+              style={styles.galleryButton}
+              onPress={pickImage}
+            >
+              <Feather name="image" size={24} color="white" />
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={styles.captureButton}
+              onPress={takePicture}
+            >
+              <View style={styles.captureButtonInner} />
+            </TouchableOpacity>
+            
+            <TouchableOpacity
+              style={styles.manualButton}
+              onPress={() => setShowManualEntry(true)}
+            >
+              <Feather name="edit" size={24} color="white" />
+            </TouchableOpacity>
+          </View>
+        </Camera>
+      )}
       
       {/* Modal for manual entry */}
       <Modal
@@ -648,6 +718,52 @@ const styles = StyleSheet.create({
   },
   cancelButton: {
     borderColor: 'rgba(255,0,0,0.3)',
+  },
+  // Web fallback styles
+  webFallback: {
+    flex: 1,
+  },
+  webFallbackContent: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  webFallbackIconContainer: {
+    alignItems: 'center',
+    marginBottom: 40,
+  },
+  webFallbackText: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginTop: 20,
+    marginBottom: 10,
+  },
+  webFallbackSubtext: {
+    fontSize: 16,
+    textAlign: 'center',
+  },
+  webFallbackButtons: {
+    width: '100%',
+    maxWidth: 400,
+    gap: 15,
+  },
+  webFallbackButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 15,
+    borderRadius: 12,
+    marginBottom: 10,
+  },
+  webFallbackButtonIcon: {
+    marginRight: 10,
+  },
+  webFallbackButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
 });
 
