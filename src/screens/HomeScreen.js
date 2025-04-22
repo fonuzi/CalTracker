@@ -1,233 +1,186 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { 
-  View, 
-  StyleSheet, 
-  ScrollView, 
-  RefreshControl,
-  TouchableOpacity
-} from 'react-native';
-import { Text, useTheme, Button } from 'react-native-paper';
-import { Feather } from '@expo/vector-icons';
-import { useFocusEffect } from '@react-navigation/native';
-
-// Import components
-import CalorieProgress from '../components/CalorieProgress';
-import NutritionCard from '../components/NutritionCard';
-import StepCounter from '../components/StepCounter';
-
-// Import context and services
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, useColorScheme } from 'react-native';
 import { UserContext } from '../context/UserContext';
 import { getFoodLogs } from '../services/StorageService';
 import { getStepsForToday } from '../services/HealthKitService';
-import { getNutrientIcon } from '../assets/icons';
+import CalorieProgress from '../components/CalorieProgress';
+import NutritionCard from '../components/NutritionCard';
+import StepCounter from '../components/StepCounter';
+import { Icon } from '../assets/icons';
+import { getNutrientIcon, getNutrientColor } from '../assets/icons';
 
-const HomeScreen = ({ navigation }) => {
-  const theme = useTheme();
-  const { userProfile, calculateDailyProgress } = useContext(UserContext);
-  
-  // State for screen data
-  const [refreshing, setRefreshing] = useState(false);
-  const [todaysFoodLogs, setTodaysFoodLogs] = useState([]);
-  const [calorieStats, setCalorieStats] = useState({ 
-    caloriesConsumed: 0, 
-    caloriesRemaining: 0, 
-    percentage: 0 
-  });
-  const [macroTotals, setMacroTotals] = useState({
+const HomeScreen = ({ navigation, theme }) => {
+  const { userProfile, calculateDailyProgress, calculateMacroTotals } = useContext(UserContext);
+  const [foodLogs, setFoodLogs] = useState([]);
+  const [nutritionData, setNutritionData] = useState({
+    caloriesConsumed: 0,
+    caloriesRemaining: 0,
+    percentage: 0,
     protein: 0,
     carbs: 0,
     fat: 0
   });
   const [steps, setSteps] = useState(0);
-  
-  // Calculate today's date
-  const today = new Date().toISOString().split('T')[0];
-  
-  // Load initial data
+  const [loading, setLoading] = useState(true);
+
+  // Load data on mount
   useEffect(() => {
-    loadHomeData();
+    loadDailyData();
+    
+    // Set up interval to refresh data every minute
+    const interval = setInterval(loadDailyData, 60000);
+    
+    // Clean up on unmount
+    return () => clearInterval(interval);
   }, []);
   
-  // Refresh data when screen comes into focus
-  useFocusEffect(
-    React.useCallback(() => {
-      loadHomeData();
-      return () => {};
-    }, [])
-  );
-  
-  // Function to load all home screen data
-  const loadHomeData = async () => {
-    setRefreshing(true);
-    
+  // Function to load daily food and step data
+  const loadDailyData = async () => {
     try {
-      // Get today's food logs
-      const logs = await getFoodLogs(today);
-      setTodaysFoodLogs(logs);
+      setLoading(true);
       
-      // Calculate calorie stats
-      const stats = calculateDailyProgress(logs);
-      setCalorieStats(stats);
+      // Get today's date in YYYY-MM-DD format
+      const today = new Date().toISOString().split('T')[0];
+      
+      // Load food logs for today
+      const logs = await getFoodLogs(today);
+      setFoodLogs(logs);
+      
+      // Calculate daily nutrition progress
+      const progress = calculateDailyProgress(logs);
       
       // Calculate macro totals
-      const { protein, carbs, fat } = calculateMacroTotals(logs);
-      setMacroTotals({ protein, carbs, fat });
+      const macros = calculateMacroTotals(logs);
       
-      // Get step count
+      // Update nutrition data
+      setNutritionData({
+        ...progress,
+        ...macros
+      });
+      
+      // Get step count for today
       const todaySteps = await getStepsForToday();
       setSteps(todaySteps);
     } catch (error) {
-      console.error('Error loading home data:', error);
+      console.error('Error loading daily data:', error);
     } finally {
-      setRefreshing(false);
+      setLoading(false);
     }
   };
   
-  // Function to calculate macro totals from food logs
-  const calculateMacroTotals = (logs) => {
-    return logs.reduce((totals, food) => {
-      return {
-        protein: totals.protein + (food.protein || 0),
-        carbs: totals.carbs + (food.carbs || 0),
-        fat: totals.fat + (food.fat || 0)
-      };
-    }, { protein: 0, carbs: 0, fat: 0 });
+  // Function to handle add food button press
+  const handleAddFood = () => {
+    navigation.navigate('Add Food');
   };
   
-  // Get macro goals from user profile
-  const getMacroGoals = () => {
-    if (!userProfile || !userProfile.macroGoals) {
-      return { proteinGoal: 0, carbsGoal: 0, fatGoal: 0 };
-    }
-    
-    return {
-      proteinGoal: userProfile.macroGoals.protein || 0,
-      carbsGoal: userProfile.macroGoals.carbs || 0,
-      fatGoal: userProfile.macroGoals.fat || 0
-    };
-  };
+  // Default calorie goal if user profile doesn't have one
+  const calorieGoal = userProfile?.calorieGoal || 2000;
   
-  const { proteinGoal, carbsGoal, fatGoal } = getMacroGoals();
-  
-  // Handle pull-to-refresh
-  const onRefresh = async () => {
-    await loadHomeData();
-  };
-  
-  // Navigate to camera screen
-  const navigateToCamera = () => {
-    navigation.navigate('Camera');
+  // Default macro goals if user profile doesn't have them
+  const macroGoals = {
+    protein: userProfile?.macroGoals?.protein || 100,
+    carbs: userProfile?.macroGoals?.carbs || 200,
+    fat: userProfile?.macroGoals?.fat || 60
   };
   
   return (
     <ScrollView 
       style={[styles.container, { backgroundColor: theme.colors.background }]}
       contentContainerStyle={styles.contentContainer}
-      refreshControl={
-        <RefreshControl 
-          refreshing={refreshing} 
-          onRefresh={onRefresh}
-          colors={[theme.colors.primary]}
-          tintColor={theme.colors.primary}
-        />
-      }
     >
-      {/* Welcome section */}
+      {/* Header with greeting */}
       <View style={styles.header}>
         <View>
-          <Text style={[styles.welcomeText, { color: theme.colors.text }]}>
-            Welcome back,
+          <Text style={[styles.greeting, { color: theme.colors.text }]}>
+            Hello, {userProfile?.name || 'there'}!
           </Text>
-          <Text style={[styles.nameText, { color: theme.colors.text }]}>
-            {userProfile?.name || 'Friend'}
+          <Text style={[styles.date, { color: theme.colors.secondaryText }]}>
+            {new Date().toLocaleDateString('en-US', { 
+              weekday: 'long', 
+              month: 'long', 
+              day: 'numeric' 
+            })}
           </Text>
         </View>
         
-        {/* Profile button */}
         <TouchableOpacity
-          style={[styles.profileButton, { backgroundColor: theme.colors.primary + '20' }]}
-          onPress={() => navigation.navigate('Profile')}
+          style={[styles.addButton, { backgroundColor: theme.colors.primary }]}
+          onPress={handleAddFood}
         >
-          <Feather name="user" size={24} color={theme.colors.primary} />
+          <Icon name="plus" size={24} color="#FFFFFF" />
         </TouchableOpacity>
       </View>
       
       {/* Calorie progress */}
-      <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-          Today's Progress
-        </Text>
-        <CalorieProgress 
-          consumed={calorieStats.caloriesConsumed}
-          goal={userProfile?.calorieGoal || 2000}
-          theme={theme}
-        />
-      </View>
+      <CalorieProgress 
+        consumed={nutritionData.caloriesConsumed} 
+        goal={calorieGoal} 
+        theme={theme} 
+      />
       
-      {/* Macro nutrients */}
-      <View style={styles.section}>
+      {/* Macronutrient cards */}
+      <View style={styles.macroSection}>
         <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
           Macronutrients
         </Text>
-        <View style={styles.macrosContainer}>
-          <NutritionCard
-            title="Protein"
-            amount={Math.round(macroTotals.protein)}
-            goal={proteinGoal}
-            icon={getNutrientIcon('protein')}
-            color={theme.colors.protein}
-          />
-          <NutritionCard
-            title="Carbs"
-            amount={Math.round(macroTotals.carbs)}
-            goal={carbsGoal}
-            icon={getNutrientIcon('carbs')}
-            color={theme.colors.carbs}
-          />
-          <NutritionCard
-            title="Fat"
-            amount={Math.round(macroTotals.fat)}
-            goal={fatGoal}
-            icon={getNutrientIcon('fat')}
-            color={theme.colors.fat}
-          />
-        </View>
-      </View>
-      
-      {/* Steps section */}
-      <View style={styles.section}>
-        <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-          Daily Activity
-        </Text>
-        <StepCounter 
-          steps={steps} 
-          goal={userProfile?.stepGoal || 10000}
+        
+        <NutritionCard
+          title="Protein"
+          amount={nutritionData.protein}
+          goal={macroGoals.protein}
+          icon={getNutrientIcon('protein')}
+          color={getNutrientColor('protein')}
+          theme={theme}
+        />
+        
+        <NutritionCard
+          title="Carbs"
+          amount={nutritionData.carbs}
+          goal={macroGoals.carbs}
+          icon={getNutrientIcon('carbs')}
+          color={getNutrientColor('carbs')}
+          theme={theme}
+        />
+        
+        <NutritionCard
+          title="Fat"
+          amount={nutritionData.fat}
+          goal={macroGoals.fat}
+          icon={getNutrientIcon('fat')}
+          color={getNutrientColor('fat')}
           theme={theme}
         />
       </View>
       
-      {/* Quick add button */}
-      <View style={styles.quickAddSection}>
-        <Button
-          mode="contained"
-          icon="camera"
-          style={styles.quickAddButton}
-          contentStyle={styles.quickAddButtonContent}
-          labelStyle={styles.quickAddButtonLabel}
-          onPress={navigateToCamera}
-        >
-          Take Photo of Food
-        </Button>
+      {/* Step counter */}
+      <StepCounter 
+        steps={steps} 
+        goal={10000} 
+        theme={theme} 
+      />
+      
+      {/* Recent meals section - could be expanded in future */}
+      <View style={styles.recentMealsSection}>
+        <View style={styles.sectionHeader}>
+          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+            Recent Meals
+          </Text>
+          <TouchableOpacity onPress={() => navigation.navigate('Food Log')}>
+            <Text style={[styles.seeAllText, { color: theme.colors.primary }]}>
+              See All
+            </Text>
+          </TouchableOpacity>
+        </View>
         
-        <Button
-          mode="outlined"
-          icon="plus"
-          style={[styles.quickAddButton, styles.secondaryButton]}
-          contentStyle={styles.quickAddButtonContent}
-          onPress={() => navigation.navigate('Food Log')}
-        >
-          Add Food Manually
-        </Button>
+        {foodLogs.length > 0 ? (
+          <Text style={{ color: theme.colors.secondaryText }}>
+            You've logged {foodLogs.length} meal{foodLogs.length !== 1 ? 's' : ''} today.
+          </Text>
+        ) : (
+          <Text style={{ color: theme.colors.secondaryText }}>
+            No meals logged today. Tap the + button to add a meal.
+          </Text>
+        )}
       </View>
     </ScrollView>
   );
@@ -238,7 +191,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   contentContainer: {
-    padding: 16,
+    padding: 20,
   },
   header: {
     flexDirection: 'row',
@@ -246,47 +199,45 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 20,
   },
-  welcomeText: {
+  greeting: {
+    fontSize: 24,
+    fontWeight: '700',
+  },
+  date: {
     fontSize: 16,
   },
-  nameText: {
-    fontSize: 24,
-    fontWeight: 'bold',
-  },
-  profileButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+  addButton: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
     justifyContent: 'center',
     alignItems: 'center',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 3,
   },
-  section: {
-    marginBottom: 24,
+  macroSection: {
+    marginBottom: 20,
   },
   sectionTitle: {
     fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 12,
+    fontWeight: '700',
+    marginBottom: 10,
   },
-  macrosContainer: {
+  recentMealsSection: {
+    marginBottom: 20,
+  },
+  sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
   },
-  quickAddSection: {
-    marginTop: 8,
-    marginBottom: 30,
-  },
-  quickAddButton: {
-    marginBottom: 12,
-  },
-  quickAddButtonContent: {
-    height: 50,
-  },
-  quickAddButtonLabel: {
-    fontSize: 16,
-  },
-  secondaryButton: {
-    borderWidth: 1,
+  seeAllText: {
+    fontSize: 14,
+    fontWeight: '600',
   },
 });
 

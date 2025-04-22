@@ -1,7 +1,7 @@
 import React from 'react';
-import { View, StyleSheet } from 'react-native';
-import { Text, Surface, useTheme, ProgressBar } from 'react-native-paper';
-import { Feather } from '@expo/vector-icons';
+import { View, Text, StyleSheet } from 'react-native';
+import { AnimatedCircularProgress } from 'react-native-circular-progress';
+import { Icon } from '../assets/icons';
 
 /**
  * A component to display the user's step count progress
@@ -9,106 +9,138 @@ import { Feather } from '@expo/vector-icons';
  * @param {number} goal - Step count goal
  * @param {Object} theme - Current theme
  */
-const StepCounter = ({ steps, goal, theme }) => {
-  // Calculate percentage of goal
-  const percentage = Math.min(1, steps / goal);
+const StepCounter = ({ steps = 0, goal = 10000, theme }) => {
+  // Calculate percentage
+  const percentage = Math.min(100, Math.round((steps / goal) * 100));
   
-  // Format number with commas
-  const formatNumber = (num) => {
-    return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-  };
+  // Format the step count with commas
+  const formattedSteps = steps.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  const formattedGoal = goal.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   
   return (
-    <Surface style={[styles.container, { backgroundColor: theme.colors.surface }]}>
-      <View style={styles.header}>
-        <View style={styles.titleContainer}>
-          <Feather name="activity" size={20} color={theme.colors.primary} style={styles.icon} />
-          <Text style={[styles.title, { color: theme.colors.text }]}>
-            Daily Steps
+    <View style={[styles.container, { backgroundColor: theme.colors.surface }]}>
+      <View style={styles.headerContainer}>
+        <View style={styles.headerLeft}>
+          <Text style={[styles.title, { color: theme.colors.text }]}>Steps</Text>
+          <Text style={[styles.subtitle, { color: theme.colors.secondaryText }]}>
+            Today
           </Text>
         </View>
-        
-        <Text style={[styles.goal, { color: theme.colors.secondaryText }]}>
-          Goal: {formatNumber(goal)}
-        </Text>
-      </View>
-      
-      <View style={styles.countContainer}>
-        <Text style={[styles.stepCount, { color: theme.colors.text }]}>
-          {formatNumber(steps)}
-        </Text>
-        <Text style={[styles.stepLabel, { color: theme.colors.secondaryText }]}>
-          steps
-        </Text>
+        <View style={[styles.iconContainer, { backgroundColor: theme.colors.primary + '20' }]}>
+          <Icon name="activity" size={18} color={theme.colors.primary} />
+        </View>
       </View>
       
       <View style={styles.progressContainer}>
-        <ProgressBar 
-          progress={percentage} 
-          color={theme.colors.primary} 
-          style={styles.progressBar} 
-        />
+        <AnimatedCircularProgress
+          size={90}
+          width={8}
+          fill={percentage}
+          tintColor={theme.colors.primary}
+          backgroundColor={theme.colors.border}
+          rotation={0}
+          lineCap="round"
+        >
+          {() => (
+            <View style={styles.innerTextContainer}>
+              <Text style={[styles.stepsText, { color: theme.colors.text }]}>
+                {formattedSteps}
+              </Text>
+              <Text style={[styles.stepsLabel, { color: theme.colors.secondaryText }]}>
+                steps
+              </Text>
+            </View>
+          )}
+        </AnimatedCircularProgress>
         
-        <Text style={[styles.percentage, { color: theme.colors.primary }]}>
-          {Math.round(percentage * 100)}%
-        </Text>
+        <View style={styles.statsContainer}>
+          <View style={styles.statItem}>
+            <Text style={[styles.statValue, { color: theme.colors.text }]}>
+              {percentage}%
+            </Text>
+            <Text style={[styles.statLabel, { color: theme.colors.secondaryText }]}>
+              of goal
+            </Text>
+          </View>
+          
+          <View style={styles.statItem}>
+            <Text style={[styles.statValue, { color: theme.colors.text }]}>
+              {formattedGoal}
+            </Text>
+            <Text style={[styles.statLabel, { color: theme.colors.secondaryText }]}>
+              target
+            </Text>
+          </View>
+        </View>
       </View>
-    </Surface>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
-    borderRadius: 16,
-    padding: 20,
-    marginVertical: 10,
+    borderRadius: 12,
+    padding: 15,
+    marginBottom: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
     elevation: 2,
   },
-  header: {
+  headerContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     marginBottom: 15,
   },
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  icon: {
-    marginRight: 6,
+  headerLeft: {
+    flex: 1,
   },
   title: {
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '600',
+    marginBottom: 2,
   },
-  goal: {
-    fontSize: 14,
+  subtitle: {
+    fontSize: 12,
   },
-  countContainer: {
+  iconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 15,
-  },
-  stepCount: {
-    fontSize: 42,
-    fontWeight: 'bold',
-  },
-  stepLabel: {
-    fontSize: 14,
-    marginTop: 5,
   },
   progressContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
   },
-  progressBar: {
+  innerTextContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepsText: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  stepsLabel: {
+    fontSize: 10,
+  },
+  statsContainer: {
     flex: 1,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 10,
+    paddingLeft: 20,
   },
-  percentage: {
-    fontSize: 14,
-    fontWeight: 'bold',
+  statItem: {
+    marginBottom: 10,
+  },
+  statValue: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  statLabel: {
+    fontSize: 12,
   },
 });
 

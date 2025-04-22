@@ -1,7 +1,7 @@
-import React from 'react';
-import { View, StyleSheet, ScrollView } from 'react-native';
-import { Text, Surface, Button, Chip, useTheme, Divider } from 'react-native-paper';
-import { Feather } from '@expo/vector-icons';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput } from 'react-native';
+import { Icon } from '../assets/icons';
+import * as Animatable from 'react-native-animatable';
 
 /**
  * A component to display the results of food analysis from OpenAI
@@ -10,324 +10,348 @@ import { Feather } from '@expo/vector-icons';
  * @param {Function} onAdjust - Function to call when adjust button is pressed
  * @param {Function} onCancel - Function to call when cancel button is pressed
  */
-const FoodAnalysisResult = ({ foodData, onSave, onAdjust, onCancel }) => {
-  const theme = useTheme();
+const FoodAnalysisResult = ({ 
+  foodData, 
+  onSave, 
+  onCancel, 
+  theme,
+  editable = true,
+}) => {
+  // State for editable values
+  const [editedFoodData, setEditedFoodData] = useState({
+    ...foodData,
+  });
   
-  if (!foodData) return null;
+  // Function to handle changes to the food data
+  const handleChange = (field, value) => {
+    setEditedFoodData(prev => ({
+      ...prev,
+      [field]: value,
+    }));
+  };
   
-  // Format the ingredients list for display
-  const formatIngredients = (ingredients) => {
-    if (!ingredients || !Array.isArray(ingredients)) return 'No ingredients data';
+  // Handle numeric input fields
+  const handleNumericChange = (field, value) => {
+    const numericValue = value.replace(/[^0-9.]/g, '');
+    handleChange(field, numericValue);
+  };
+  
+  // Function to handle save button press
+  const handleSave = () => {
+    // Convert string numeric values to actual numbers
+    const processedData = {
+      ...editedFoodData,
+      calories: parseFloat(editedFoodData.calories) || 0,
+      protein: parseFloat(editedFoodData.protein) || 0,
+      carbs: parseFloat(editedFoodData.carbs) || 0,
+      fat: parseFloat(editedFoodData.fat) || 0,
+      fiber: parseFloat(editedFoodData.fiber) || 0,
+      sugar: parseFloat(editedFoodData.sugar) || 0,
+    };
     
-    return ingredients.join(', ');
+    if (onSave) {
+      onSave(processedData);
+    }
+  };
+  
+  // Render nutritional values in a list
+  const renderNutritionList = () => {
+    const nutritionItems = [
+      { label: 'Calories', value: editedFoodData.calories, unit: 'cal', field: 'calories' },
+      { label: 'Protein', value: editedFoodData.protein, unit: 'g', field: 'protein' },
+      { label: 'Carbs', value: editedFoodData.carbs, unit: 'g', field: 'carbs' },
+      { label: 'Fat', value: editedFoodData.fat, unit: 'g', field: 'fat' },
+      { label: 'Fiber', value: editedFoodData.fiber, unit: 'g', field: 'fiber' },
+      { label: 'Sugar', value: editedFoodData.sugar, unit: 'g', field: 'sugar' },
+    ];
+    
+    return nutritionItems.map((item, index) => (
+      <View key={index} style={styles.nutritionItem}>
+        <Text style={[styles.nutritionLabel, { color: theme.colors.text }]}>
+          {item.label}
+        </Text>
+        <View style={styles.nutritionValueContainer}>
+          {editable ? (
+            <TextInput
+              style={[styles.nutritionInput, { color: theme.colors.text, borderColor: theme.colors.border }]}
+              value={item.value.toString()}
+              onChangeText={(text) => handleNumericChange(item.field, text)}
+              keyboardType="numeric"
+              selectTextOnFocus
+            />
+          ) : (
+            <Text style={[styles.nutritionValue, { color: theme.colors.text }]}>
+              {item.value}
+            </Text>
+          )}
+          <Text style={[styles.nutritionUnit, { color: theme.colors.secondaryText }]}>
+            {item.unit}
+          </Text>
+        </View>
+      </View>
+    ));
+  };
+  
+  // Render lists (ingredients, health benefits, concerns)
+  const renderList = (title, items) => {
+    if (!items || items.length === 0) return null;
+    
+    return (
+      <View style={styles.listContainer}>
+        <Text style={[styles.listTitle, { color: theme.colors.text }]}>{title}</Text>
+        {items.map((item, index) => (
+          <View key={index} style={styles.listItem}>
+            <Text style={[styles.listItemText, { color: theme.colors.secondaryText }]}>
+              • {item}
+            </Text>
+          </View>
+        ))}
+      </View>
+    );
   };
   
   return (
-    <ScrollView 
-      style={styles.scrollView}
-      contentContainerStyle={styles.scrollContent}
+    <Animatable.View
+      animation="fadeInUp"
+      duration={500}
+      style={[styles.container, { backgroundColor: theme.colors.surface }]}
     >
-      <Surface style={[styles.container, { backgroundColor: theme.colors.surface }]}>
-        <View style={styles.header}>
+      <View style={styles.header}>
+        <View>
           <Text style={[styles.title, { color: theme.colors.text }]}>
-            {foodData.name || 'Food Analysis'}
+            Food Analysis
           </Text>
-          
-          <Chip 
-            mode="outlined" 
-            style={[styles.methodChip, { borderColor: theme.colors.primary }]}
-            textStyle={{ color: theme.colors.primary }}
-          >
-            {foodData.method === 'image' ? 'AI Image Analysis' : 'AI Text Analysis'}
-          </Chip>
-        </View>
-        
-        <View style={styles.calorieContainer}>
-          <Text style={[styles.calorieValue, { color: theme.colors.text }]}>
-            {foodData.calories || 0}
-          </Text>
-          <Text style={[styles.calorieLabel, { color: theme.colors.secondaryText }]}>
-            calories
+          <Text style={[styles.subtitle, { color: theme.colors.secondaryText }]}>
+            Powered by AI
           </Text>
         </View>
-        
-        <View style={styles.macrosContainer}>
-          <View style={styles.macroItem}>
-            <Text style={[styles.macroValue, { color: theme.colors.protein }]}>
-              {foodData.protein || 0}g
+        <TouchableOpacity onPress={onCancel} hitSlop={{ top: 20, bottom: 20, left: 20, right: 20 }}>
+          <Icon name="x" size={24} color={theme.colors.text} />
+        </TouchableOpacity>
+      </View>
+      
+      <ScrollView style={styles.scrollContainer}>
+        <View style={styles.foodInfoContainer}>
+          <Text style={[styles.foodInfoLabel, { color: theme.colors.secondaryText }]}>
+            Food Name
+          </Text>
+          {editable ? (
+            <TextInput
+              style={[styles.foodNameInput, { color: theme.colors.text, borderColor: theme.colors.border }]}
+              value={editedFoodData.name}
+              onChangeText={(text) => handleChange('name', text)}
+              placeholder="Enter food name"
+              placeholderTextColor={theme.colors.placeholder}
+            />
+          ) : (
+            <Text style={[styles.foodName, { color: theme.colors.text }]}>
+              {editedFoodData.name}
             </Text>
-            <Text style={[styles.macroLabel, { color: theme.colors.secondaryText }]}>
-              Protein
-            </Text>
-          </View>
-          
-          <View style={styles.macroItem}>
-            <Text style={[styles.macroValue, { color: theme.colors.carbs }]}>
-              {foodData.carbs || 0}g
-            </Text>
-            <Text style={[styles.macroLabel, { color: theme.colors.secondaryText }]}>
-              Carbs
-            </Text>
-          </View>
-          
-          <View style={styles.macroItem}>
-            <Text style={[styles.macroValue, { color: theme.colors.fat }]}>
-              {foodData.fat || 0}g
-            </Text>
-            <Text style={[styles.macroLabel, { color: theme.colors.secondaryText }]}>
-              Fat
-            </Text>
-          </View>
-        </View>
-        
-        <Divider style={[styles.divider, { backgroundColor: theme.colors.border }]} />
-        
-        <View style={styles.detailsContainer}>
-          {foodData.serving_size && (
-            <View style={styles.detailItem}>
-              <Text style={[styles.detailLabel, { color: theme.colors.secondaryText }]}>
-                Serving Size
-              </Text>
-              <Text style={[styles.detailValue, { color: theme.colors.text }]}>
-                {foodData.serving_size}
-              </Text>
-            </View>
-          )}
-          
-          {foodData.sugar !== undefined && (
-            <View style={styles.detailItem}>
-              <Text style={[styles.detailLabel, { color: theme.colors.secondaryText }]}>
-                Sugar
-              </Text>
-              <Text style={[styles.detailValue, { color: theme.colors.text }]}>
-                {foodData.sugar}g
-              </Text>
-            </View>
-          )}
-          
-          {foodData.fiber !== undefined && (
-            <View style={styles.detailItem}>
-              <Text style={[styles.detailLabel, { color: theme.colors.secondaryText }]}>
-                Fiber
-              </Text>
-              <Text style={[styles.detailValue, { color: theme.colors.text }]}>
-                {foodData.fiber}g
-              </Text>
-            </View>
           )}
         </View>
         
-        {foodData.ingredients && (
-          <View style={styles.ingredientsContainer}>
-            <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
-              Ingredients
+        <View style={styles.foodInfoContainer}>
+          <Text style={[styles.foodInfoLabel, { color: theme.colors.secondaryText }]}>
+            Serving Size
+          </Text>
+          {editable ? (
+            <TextInput
+              style={[styles.servingSizeInput, { color: theme.colors.text, borderColor: theme.colors.border }]}
+              value={editedFoodData.serving_size}
+              onChangeText={(text) => handleChange('serving_size', text)}
+              placeholder="Enter serving size"
+              placeholderTextColor={theme.colors.placeholder}
+            />
+          ) : (
+            <Text style={[styles.servingSize, { color: theme.colors.text }]}>
+              {editedFoodData.serving_size}
             </Text>
-            <Text style={[styles.ingredientsText, { color: theme.colors.secondaryText }]}>
-              {formatIngredients(foodData.ingredients)}
-            </Text>
-          </View>
+          )}
+        </View>
+        
+        <View style={styles.divider} />
+        
+        <View style={styles.nutritionContainer}>
+          <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>
+            Nutrition Facts
+          </Text>
+          {renderNutritionList()}
+        </View>
+        
+        <View style={styles.divider} />
+        
+        {renderList('Ingredients', editedFoodData.ingredients)}
+        
+        {editedFoodData.ingredients && editedFoodData.ingredients.length > 0 && (
+          <View style={styles.divider} />
         )}
         
-        <View style={styles.infoContainer}>
-          {foodData.health_benefits && Array.isArray(foodData.health_benefits) && foodData.health_benefits.length > 0 && (
-            <View style={styles.infoSection}>
-              <View style={styles.infoHeader}>
-                <Feather name="heart" size={16} color={theme.colors.success} style={styles.infoIcon} />
-                <Text style={[styles.infoTitle, { color: theme.colors.text }]}>
-                  Health Benefits
-                </Text>
-              </View>
-              
-              <View style={styles.bulletList}>
-                {foodData.health_benefits.map((benefit, index) => (
-                  <View key={index} style={styles.bulletItem}>
-                    <Text style={[styles.bullet, { color: theme.colors.success }]}>•</Text>
-                    <Text style={[styles.bulletText, { color: theme.colors.secondaryText }]}>
-                      {benefit}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-            </View>
-          )}
-          
-          {foodData.concerns && Array.isArray(foodData.concerns) && foodData.concerns.length > 0 && (
-            <View style={styles.infoSection}>
-              <View style={styles.infoHeader}>
-                <Feather name="alert-circle" size={16} color={theme.colors.error} style={styles.infoIcon} />
-                <Text style={[styles.infoTitle, { color: theme.colors.text }]}>
-                  Health Concerns
-                </Text>
-              </View>
-              
-              <View style={styles.bulletList}>
-                {foodData.concerns.map((concern, index) => (
-                  <View key={index} style={styles.bulletItem}>
-                    <Text style={[styles.bullet, { color: theme.colors.error }]}>•</Text>
-                    <Text style={[styles.bulletText, { color: theme.colors.secondaryText }]}>
-                      {concern}
-                    </Text>
-                  </View>
-                ))}
-              </View>
-            </View>
-          )}
-        </View>
+        {renderList('Health Benefits', editedFoodData.health_benefits)}
         
-        <View style={styles.buttonContainer}>
-          <Button 
-            mode="text" 
-            onPress={onCancel}
-            style={styles.button}
+        {editedFoodData.health_benefits && editedFoodData.health_benefits.length > 0 && (
+          <View style={styles.divider} />
+        )}
+        
+        {renderList('Potential Concerns', editedFoodData.concerns)}
+      </ScrollView>
+      
+      <View style={styles.buttonContainer}>
+        {editable && (
+          <TouchableOpacity
+            style={[styles.button, styles.saveButton, { backgroundColor: theme.colors.primary }]}
+            onPress={handleSave}
           >
+            <Text style={styles.buttonText}>Save</Text>
+          </TouchableOpacity>
+        )}
+        
+        <TouchableOpacity
+          style={[styles.button, styles.cancelButton, { borderColor: theme.colors.border }]}
+          onPress={onCancel}
+        >
+          <Text style={[styles.cancelButtonText, { color: theme.colors.text }]}>
             Cancel
-          </Button>
-          
-          <Button 
-            mode="outlined" 
-            onPress={onAdjust}
-            style={styles.button}
-          >
-            Adjust
-          </Button>
-          
-          <Button 
-            mode="contained" 
-            onPress={onSave}
-            style={styles.button}
-          >
-            Save
-          </Button>
-        </View>
-      </Surface>
-    </ScrollView>
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </Animatable.View>
   );
 };
 
 const styles = StyleSheet.create({
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    padding: 16,
-  },
   container: {
-    borderRadius: 16,
-    padding: 16,
-    elevation: 4,
+    flex: 1,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 20,
   },
   title: {
     fontSize: 20,
-    fontWeight: 'bold',
+    fontWeight: '700',
+  },
+  subtitle: {
+    fontSize: 14,
+  },
+  scrollContainer: {
     flex: 1,
   },
-  methodChip: {
-    height: 28,
+  foodInfoContainer: {
+    marginBottom: 15,
   },
-  calorieContainer: {
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  calorieValue: {
-    fontSize: 42,
-    fontWeight: 'bold',
-  },
-  calorieLabel: {
-    fontSize: 16,
-  },
-  macrosContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginBottom: 20,
-  },
-  macroItem: {
-    alignItems: 'center',
-  },
-  macroValue: {
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  macroLabel: {
+  foodInfoLabel: {
     fontSize: 14,
+    marginBottom: 5,
+  },
+  foodNameInput: {
+    fontSize: 18,
+    fontWeight: '600',
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 10,
+  },
+  foodName: {
+    fontSize: 18,
+    fontWeight: '600',
+  },
+  servingSizeInput: {
+    fontSize: 16,
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 10,
+  },
+  servingSize: {
+    fontSize: 16,
   },
   divider: {
-    marginVertical: 16,
+    height: 1,
+    backgroundColor: '#333333',
+    marginVertical: 15,
   },
-  detailsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginBottom: 16,
-  },
-  detailItem: {
-    width: '33.3%',
-    paddingHorizontal: 4,
-    marginBottom: 12,
-  },
-  detailLabel: {
-    fontSize: 12,
-  },
-  detailValue: {
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  ingredientsContainer: {
-    marginBottom: 16,
+  nutritionContainer: {
+    marginBottom: 15,
   },
   sectionTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 10,
+  },
+  nutritionItem: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  nutritionLabel: {
     fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 8,
   },
-  ingredientsText: {
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  infoContainer: {
-    marginBottom: 16,
-  },
-  infoSection: {
-    marginBottom: 12,
-  },
-  infoHeader: {
+  nutritionValueContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
   },
-  infoIcon: {
-    marginRight: 6,
-  },
-  infoTitle: {
+  nutritionInput: {
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '600',
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 8,
+    width: 60,
+    textAlign: 'center',
   },
-  bulletList: {},
-  bulletItem: {
-    flexDirection: 'row',
-    marginBottom: 4,
-  },
-  bullet: {
+  nutritionValue: {
     fontSize: 16,
-    marginRight: 8,
-    marginTop: -2,
+    fontWeight: '600',
   },
-  bulletText: {
+  nutritionUnit: {
     fontSize: 14,
-    flex: 1,
+    marginLeft: 4,
+  },
+  listContainer: {
+    marginBottom: 15,
+  },
+  listTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    marginBottom: 10,
+  },
+  listItem: {
+    marginBottom: 5,
+  },
+  listItemText: {
+    fontSize: 16,
+    lineHeight: 22,
   },
   buttonContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    marginTop: 20,
   },
   button: {
     flex: 1,
-    marginHorizontal: 4,
+    borderRadius: 12,
+    padding: 15,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  saveButton: {
+    marginRight: 10,
+  },
+  cancelButton: {
+    borderWidth: 1,
+  },
+  buttonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  cancelButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 

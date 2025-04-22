@@ -1,74 +1,36 @@
-// Spacing values for consistent layout
-const spacing = {
-  tiny: 2,
-  xxsmall: 4,
-  xsmall: 8,
-  small: 12,
-  medium: 16,
-  large: 20,
-  xlarge: 24,
-  xxlarge: 32,
-  xxxlarge: 40,
-  huge: 48,
-  xhuge: 56,
-  xxhuge: 64,
-  giant: 80,
-};
+/**
+ * Spacing definitions for the app
+ */
 
-// Layout margins
-const layout = {
-  screenMargin: spacing.medium,
-  cardMargin: spacing.small,
-  sectionMargin: spacing.xlarge,
-  contentPadding: spacing.medium,
-};
-
-// Border radius
-const borderRadius = {
-  small: 4,
-  medium: 8,
-  large: 12,
-  xlarge: 16,
-  round: 999,
-};
-
-// Shadow styles
-const shadows = {
-  small: {
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.23,
-    shadowRadius: 2.62,
-    elevation: 4,
+export const spacing = {
+  // Base spacing unit (4px)
+  xs: 4,
+  sm: 8,
+  md: 16,
+  lg: 24,
+  xl: 32,
+  xxl: 40,
+  xxxl: 64,
+  
+  // Other useful spacing values
+  none: 0,
+  half: 2,
+  
+  // Specific use cases
+  screenPadding: 16,
+  cardPadding: 16,
+  inputPadding: 12,
+  buttonPadding: 16,
+  iconSize: {
+    small: 16,
+    medium: 24,
+    large: 32,
   },
-  medium: {
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 3,
-    },
-    shadowOpacity: 0.27,
-    shadowRadius: 4.65,
-    elevation: 6,
+  borderRadius: {
+    small: 4,
+    medium: 8,
+    large: 12,
+    xl: 24,
+    circle: 9999,
   },
-  large: {
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 6,
-    },
-    shadowOpacity: 0.37,
-    shadowRadius: 7.49,
-    elevation: 12,
-  },
-};
-
-export default {
-  spacing,
-  layout,
-  borderRadius,
-  shadows,
 };
