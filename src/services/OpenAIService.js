@@ -1,24 +1,21 @@
 import * as FileSystem from 'expo-file-system';
 import { Platform } from 'react-native';
+import OpenAI from 'openai';
 
-// Check if OpenAI API key is available
-const hasOpenAIKey = process.env.OPENAI_API_KEY || false;
+// In Expo/React Native, we need to access environment variables differently
+// The key is available through process.env.OPENAI_API_KEY
+const API_KEY = process.env.OPENAI_API_KEY;
 
-// Import OpenAI only if key is available to avoid errors
-let OpenAI;
-let openai;
+console.log("OpenAI API Key available:", API_KEY ? "Yes" : "No");
 
-if (hasOpenAIKey) {
-  try {
-    OpenAI = require('openai').default;
-    openai = new OpenAI({ 
-      apiKey: process.env.OPENAI_API_KEY 
-    });
-    console.log('OpenAI client initialized successfully');
-  } catch (error) {
-    console.error('Error initializing OpenAI client:', error);
-  }
-}
+// Create OpenAI client instance
+const openai = new OpenAI({ 
+  apiKey: API_KEY,
+  dangerouslyAllowBrowser: true // Required for web environments
+});
+
+// Function to check if the API key is valid
+const hasValidOpenAIKey = !!API_KEY;
 
 /**
  * Analyzes a food image to extract nutritional information
@@ -27,7 +24,7 @@ if (hasOpenAIKey) {
  */
 export const analyzeFoodImage = async (imageUri) => {
   // If OpenAI is not available, return demo data
-  if (!hasOpenAIKey || !openai) {
+  if (!hasValidOpenAIKey) {
     console.log('OpenAI API key not found, using demo data');
     return getDemoFoodData('image');
   }
@@ -38,11 +35,77 @@ export const analyzeFoodImage = async (imageUri) => {
     let base64Image;
     
     if (isWeb) {
-      // In web, we can't access the file system the same way
-      // We might not have a proper base64 image in the web environment
-      console.log('Web environment detected, using text analysis as fallback');
-      // Return demo data for now as web doesn't support this well
-      return getDemoFoodData('image');
+      // In web environments, we can't access the file system the same way
+      // Instead of using demo data, let's use text analysis for the "food in image"
+      console.log('Web environment detected, attempting to analyze image URL directly');
+      
+      try {
+        // For web, we'll send the image URL directly to OpenAI rather than base64
+        // This works with remote images in web
+        
+        const prompt = `
+          Please analyze this food image and provide detailed nutritional information in JSON format.
+          Identify all visible food items and estimate their nutritional content as accurately as possible.
+          Include the following fields:
+          - name: The name of the food (be specific and descriptive)
+          - calories: Total calories (numeric value only)
+          - protein: Protein in grams (numeric value only)
+          - carbs: Carbohydrates in grams (numeric value only)
+          - fat: Fat in grams (numeric value only)
+          - fiber: Fiber in grams (numeric value only)
+          - sugar: Sugar in grams (numeric value only)
+          - serving_size: Serving size (e.g., "1 cup", "100g")
+          - ingredients: Array of main ingredients (be comprehensive)
+          - health_benefits: Array of health benefits
+          - concerns: Array of potential health concerns or allergens
+          
+          Return only valid JSON with these fields.
+        `;
+        
+        // Call the OpenAI API with the image URL directly
+        // Note: This requires the image to be accessible via URL, which may not work with local image URIs
+        // If this fails, we'll catch it and use the demo data
+        const response = await openai.chat.completions.create({
+          model: "gpt-4o", // the newest OpenAI model is "gpt-4o" which was released May 13, 2024
+          messages: [
+            {
+              role: "user",
+              content: [
+                { type: "text", text: prompt },
+                {
+                  type: "image_url",
+                  image_url: {
+                    url: imageUri,
+                  },
+                },
+              ],
+            },
+          ],
+          response_format: { type: "json_object" },
+          max_tokens: 1000,
+        });
+        
+        // Parse and return the nutrition data
+        const nutritionData = JSON.parse(response.choices[0].message.content);
+        
+        // Ensure all numeric values are actually numbers
+        nutritionData.calories = parseFloat(nutritionData.calories) || 0;
+        nutritionData.protein = parseFloat(nutritionData.protein) || 0;
+        nutritionData.carbs = parseFloat(nutritionData.carbs) || 0;
+        nutritionData.fat = parseFloat(nutritionData.fat) || 0;
+        nutritionData.fiber = parseFloat(nutritionData.fiber) || 0;
+        nutritionData.sugar = parseFloat(nutritionData.sugar) || 0;
+        
+        // Add method information
+        nutritionData.method = 'image';
+        
+        return nutritionData;
+      } catch (webError) {
+        console.error('Web image analysis failed:', webError);
+        console.log('Falling back to demo data for web environment');
+        // If web analysis fails, use demo data as fallback
+        return getDemoFoodData('image');
+      }
     } else {
       // Native platforms can read the file directly
       base64Image = await FileSystem.readAsStringAsync(imageUri, {
@@ -124,7 +187,7 @@ export const analyzeFoodImage = async (imageUri) => {
  */
 export const analyzeFoodText = async (text) => {
   // If OpenAI is not available, return demo data
-  if (!hasOpenAIKey || !openai) {
+  if (!hasValidOpenAIKey) {
     console.log('OpenAI API key not found, using demo data');
     return getDemoFoodData('text', text);
   }
@@ -190,7 +253,7 @@ export const analyzeFoodText = async (text) => {
  */
 export const analyzeFitnessGoals = async (userData) => {
   // If OpenAI is not available, return demo data
-  if (!hasOpenAIKey || !openai) {
+  if (!hasValidOpenAIKey) {
     console.log('OpenAI API key not found, using demo data');
     return getDemoFitnessRecommendations(userData);
   }
