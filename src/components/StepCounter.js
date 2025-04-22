@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
+import { AnimatedCircularProgress } from 'react-native-circular-progress';
 import { Icon } from '../assets/icons';
-import { stepsToDistance, calculateCaloriesBurned } from '../utils/calculators';
 
 /**
  * A component to display the user's step count progress
@@ -9,76 +9,68 @@ import { stepsToDistance, calculateCaloriesBurned } from '../utils/calculators';
  * @param {number} goal - Step count goal
  * @param {Object} theme - Current theme
  */
-const StepCounter = ({ steps, goal, theme }) => {
-  // Calculate percentage of daily goal
+const StepCounter = ({ steps = 0, goal = 10000, theme }) => {
+  // Calculate percentage
   const percentage = Math.min(100, Math.round((steps / goal) * 100));
   
-  // Calculate distance in km (estimated based on average stride length)
-  const distance = stepsToDistance(steps);
-  
-  // Calculate calories burned (estimated based on average metrics)
-  const caloriesBurned = calculateCaloriesBurned(steps);
-  
-  // Format large numbers with commas
-  const formatNumber = (num) => {
-    return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-  };
+  // Format the step count with commas
+  const formattedSteps = steps.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  const formattedGoal = goal.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.surface }]}>
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.iconContainer}>
-          <Icon name="activity" size={20} color={theme.colors.primary} />
-          <Text style={[styles.title, { color: theme.colors.text }]}>Daily Steps</Text>
+      <View style={styles.headerContainer}>
+        <View style={styles.headerLeft}>
+          <Text style={[styles.title, { color: theme.colors.text }]}>Steps</Text>
+          <Text style={[styles.subtitle, { color: theme.colors.secondaryText }]}>
+            Today
+          </Text>
         </View>
-        <Text style={[styles.goalText, { color: theme.colors.secondaryText }]}>
-          Goal: {formatNumber(goal)}
-        </Text>
+        <View style={[styles.iconContainer, { backgroundColor: theme.colors.primary + '20' }]}>
+          <Icon name="activity" size={18} color={theme.colors.primary} />
+        </View>
       </View>
       
-      {/* Step count */}
-      <Text style={[styles.stepCount, { color: theme.colors.text }]}>
-        {formatNumber(steps)}
-        <Text style={[styles.stepLabel, { color: theme.colors.secondaryText }]}>
-          {' '}steps
-        </Text>
-      </Text>
-      
-      {/* Progress bar */}
-      <View style={[styles.progressBar, { backgroundColor: theme.colors.border }]}>
-        <View
-          style={[
-            styles.progressFill,
-            {
-              width: `${percentage}%`,
-              backgroundColor: theme.colors.primary,
-            },
-          ]}
-        />
-      </View>
-      
-      {/* Additional metrics */}
-      <View style={styles.metricsContainer}>
-        <View style={styles.metricItem}>
-          <Icon name="map-pin" size={16} color={theme.colors.primary} style={styles.metricIcon} />
-          <Text style={[styles.metricValue, { color: theme.colors.text }]}>
-            {distance} km
-          </Text>
-        </View>
+      <View style={styles.progressContainer}>
+        <AnimatedCircularProgress
+          size={90}
+          width={8}
+          fill={percentage}
+          tintColor={theme.colors.primary}
+          backgroundColor={theme.colors.border}
+          rotation={0}
+          lineCap="round"
+        >
+          {() => (
+            <View style={styles.innerTextContainer}>
+              <Text style={[styles.stepsText, { color: theme.colors.text }]}>
+                {formattedSteps}
+              </Text>
+              <Text style={[styles.stepsLabel, { color: theme.colors.secondaryText }]}>
+                steps
+              </Text>
+            </View>
+          )}
+        </AnimatedCircularProgress>
         
-        <View style={styles.metricItem}>
-          <Icon name="zap" size={16} color={theme.colors.primary} style={styles.metricIcon} />
-          <Text style={[styles.metricValue, { color: theme.colors.text }]}>
-            {caloriesBurned} kcal
-          </Text>
-        </View>
-        
-        <View style={styles.metricItem}>
-          <Icon name="percent" size={16} color={theme.colors.primary} style={styles.metricIcon} />
-          <Text style={[styles.metricValue, { color: theme.colors.text }]}>
-            {percentage}%
-          </Text>
+        <View style={styles.statsContainer}>
+          <View style={styles.statItem}>
+            <Text style={[styles.statValue, { color: theme.colors.text }]}>
+              {percentage}%
+            </Text>
+            <Text style={[styles.statLabel, { color: theme.colors.secondaryText }]}>
+              of goal
+            </Text>
+          </View>
+          
+          <View style={styles.statItem}>
+            <Text style={[styles.statValue, { color: theme.colors.text }]}>
+              {formattedGoal}
+            </Text>
+            <Text style={[styles.statLabel, { color: theme.colors.secondaryText }]}>
+              target
+            </Text>
+          </View>
         </View>
       </View>
     </View>
@@ -87,61 +79,68 @@ const StepCounter = ({ steps, goal, theme }) => {
 
 const styles = StyleSheet.create({
   container: {
-    borderRadius: 16,
-    padding: 16,
-    marginVertical: 8,
+    borderRadius: 12,
+    padding: 15,
+    marginBottom: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
-  header: {
+  headerContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: 15,
   },
-  iconContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  headerLeft: {
+    flex: 1,
   },
   title: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginLeft: 8,
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 2,
   },
-  goalText: {
-    fontSize: 14,
+  subtitle: {
+    fontSize: 12,
   },
-  stepCount: {
-    fontSize: 36,
-    fontWeight: 'bold',
-    marginBottom: 12,
-  },
-  stepLabel: {
-    fontSize: 18,
-    fontWeight: 'normal',
-  },
-  progressBar: {
-    height: 8,
-    borderRadius: 4,
-    marginBottom: 16,
-    overflow: 'hidden',
-  },
-  progressFill: {
-    height: '100%',
-    borderRadius: 4,
-  },
-  metricsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  metricItem: {
-    flexDirection: 'row',
+  iconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
     alignItems: 'center',
   },
-  metricIcon: {
-    marginRight: 4,
+  progressContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
-  metricValue: {
-    fontSize: 14,
-    fontWeight: '500',
+  innerTextContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepsText: {
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  stepsLabel: {
+    fontSize: 10,
+  },
+  statsContainer: {
+    flex: 1,
+    paddingLeft: 20,
+  },
+  statItem: {
+    marginBottom: 10,
+  },
+  statValue: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  statLabel: {
+    fontSize: 12,
   },
 });
 

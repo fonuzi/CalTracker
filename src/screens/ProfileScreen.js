@@ -1,711 +1,308 @@
-import React, { useState, useContext } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  ScrollView,
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  Alert,
-} from 'react-native';
+import React, { useContext, useState } from 'react';
+import { StyleSheet, View, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { Text, Avatar, Card, Title, TextInput, Button, useTheme, Divider } from 'react-native-paper';
+import { Feather } from '@expo/vector-icons';
 import { UserContext } from '../context/UserContext';
-import { Icon } from '../assets/icons';
-import { calculateBMI, getBMICategory } from '../utils/calculators';
-import * as Animatable from 'react-native-animatable';
+import { calculateBMI, calculateBMR } from '../utils/calculators';
 
-const ProfileScreen = ({ navigation, theme }) => {
+const ProfileScreen = ({ navigation }) => {
+  const theme = useTheme();
   const { userProfile, updateUserProfile } = useContext(UserContext);
-  const [loading, setLoading] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [formData, setFormData] = useState({
+    name: userProfile?.name || '',
+    age: userProfile?.age || '',
+    gender: userProfile?.gender || '',
+    weight: userProfile?.weight || '',
+    height: userProfile?.height || '',
+    activityLevel: userProfile?.activityLevel || '',
+    fitnessGoal: userProfile?.fitnessGoal || '',
+    dietaryRestrictions: userProfile?.dietaryRestrictions || [],
+  });
+
+  const bmi = userProfile ? calculateBMI(
+    parseFloat(userProfile.weight), 
+    parseFloat(userProfile.height)
+  ) : null;
   
-  // Form state
-  const [name, setName] = useState(userProfile?.name || '');
-  const [age, setAge] = useState(userProfile?.age ? String(userProfile.age) : '');
-  const [gender, setGender] = useState(userProfile?.gender || 'other');
-  const [weight, setWeight] = useState(
-    userProfile?.weight ? String(userProfile.weight) : ''
-  );
-  const [height, setHeight] = useState(
-    userProfile?.height ? String(userProfile.height) : ''
-  );
-  const [activityLevel, setActivityLevel] = useState(
-    userProfile?.activityLevel || 'moderate'
-  );
-  const [fitnessGoal, setFitnessGoal] = useState(
-    userProfile?.fitnessGoal || 'maintain'
-  );
-  
-  // Handle save profile
-  const handleSaveProfile = async () => {
-    // Validate form
-    if (!name.trim()) {
-      Alert.alert('Error', 'Please enter your name');
+  const bmr = userProfile ? calculateBMR(
+    parseFloat(userProfile.weight),
+    parseFloat(userProfile.height),
+    parseInt(userProfile.age, 10),
+    userProfile.gender
+  ) : null;
+
+  const activityLevels = {
+    'sedentary': 'Mostly inactive',
+    'light': 'Light exercise 1-3 days/week',
+    'moderate': 'Moderate exercise 3-5 days/week',
+    'active': 'Active exercise 6-7 days/week',
+    'very_active': 'Very active & physical job'
+  };
+
+  const fitnessGoals = {
+    'lose_weight': 'Lose Weight',
+    'maintain': 'Maintain Weight',
+    'gain_muscle': 'Gain Muscle',
+    'improve_fitness': 'Improve Fitness'
+  };
+
+  const handleInputChange = (field, value) => {
+    setFormData({
+      ...formData,
+      [field]: value
+    });
+  };
+
+  const handleSave = () => {
+    // Basic validation
+    if (!formData.name.trim()) {
+      Alert.alert('Missing Information', 'Please enter your name');
       return;
     }
-    
+
     try {
-      setLoading(true);
+      // Update user profile with new data
+      updateUserProfile(formData);
+      setIsEditing(false);
       
-      // Create updated profile
-      const updatedProfile = {
-        ...userProfile,
-        name,
-        age: parseInt(age) || 30,
-        gender,
-        weight: parseFloat(weight) || 70,
-        height: parseFloat(height) || 170,
-        activityLevel,
-        fitnessGoal,
-        updatedAt: new Date().toISOString(),
-      };
-      
-      // Update user profile
-      await updateUserProfile(updatedProfile);
-      
-      // Navigate back
-      navigation.goBack();
+      Alert.alert('Success', 'Your profile has been updated!');
     } catch (error) {
       console.error('Error saving profile:', error);
-      Alert.alert('Error', 'Failed to save profile. Please try again.');
-    } finally {
-      setLoading(false);
+      Alert.alert('Error', 'Failed to save your profile. Please try again.');
     }
   };
-  
-  // Calculate BMI if weight and height are available
-  const calculateUserBMI = () => {
-    const userWeight = parseFloat(weight);
-    const userHeight = parseFloat(height);
-    
-    if (userWeight && userHeight) {
-      return calculateBMI(userWeight, userHeight);
-    }
-    
-    return 0;
+
+  const getBmiCategory = (bmi) => {
+    if (bmi < 18.5) return { category: 'Underweight', color: '#64B5F6' };
+    if (bmi < 25) return { category: 'Healthy Weight', color: '#66BB6A' };
+    if (bmi < 30) return { category: 'Overweight', color: '#FFB74D' };
+    return { category: 'Obesity', color: '#E57373' };
   };
-  
-  // Get BMI category
-  const getBMICategoryInfo = () => {
-    const bmi = calculateUserBMI();
-    return getBMICategory(bmi);
-  };
-  
-  // BMI info
-  const bmi = calculateUserBMI();
-  const bmiCategory = getBMICategoryInfo();
-  
-  // Loading indicator
-  if (loading) {
+
+  const renderProfileDetails = () => {
+    const bmiInfo = bmi ? getBmiCategory(bmi) : null;
+
     return (
-      <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
-        <ActivityIndicator size="large" color={theme.colors.primary} />
+      <View style={styles.profileDetails}>
+        <Card style={[styles.card, { backgroundColor: theme.colors.surface }]}>
+          <Card.Content>
+            <Title style={{ color: theme.colors.text }}>Personal Information</Title>
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Name</Text>
+              <Text style={[styles.detailValue, { color: theme.colors.text }]}>
+                {userProfile?.name || 'Not set'}
+              </Text>
+            </View>
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Age</Text>
+              <Text style={[styles.detailValue, { color: theme.colors.text }]}>
+                {userProfile?.age ? `${userProfile.age} years` : 'Not set'}
+              </Text>
+            </View>
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Gender</Text>
+              <Text style={[styles.detailValue, { color: theme.colors.text }]}>
+                {userProfile?.gender ? userProfile.gender.charAt(0).toUpperCase() + userProfile.gender.slice(1) : 'Not set'}
+              </Text>
+            </View>
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Weight</Text>
+              <Text style={[styles.detailValue, { color: theme.colors.text }]}>
+                {userProfile?.weight ? `${userProfile.weight} kg` : 'Not set'}
+              </Text>
+            </View>
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Height</Text>
+              <Text style={[styles.detailValue, { color: theme.colors.text }]}>
+                {userProfile?.height ? `${userProfile.height} cm` : 'Not set'}
+              </Text>
+            </View>
+          </Card.Content>
+        </Card>
+
+        <Card style={[styles.card, { backgroundColor: theme.colors.surface }]}>
+          <Card.Content>
+            <Title style={{ color: theme.colors.text }}>Fitness Profile</Title>
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Activity Level</Text>
+              <Text style={[styles.detailValue, { color: theme.colors.text }]}>
+                {userProfile?.activityLevel ? activityLevels[userProfile.activityLevel] : 'Not set'}
+              </Text>
+            </View>
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Fitness Goal</Text>
+              <Text style={[styles.detailValue, { color: theme.colors.text }]}>
+                {userProfile?.fitnessGoal ? fitnessGoals[userProfile.fitnessGoal] : 'Not set'}
+              </Text>
+            </View>
+            <View style={styles.detailRow}>
+              <Text style={styles.detailLabel}>Daily Calorie Goal</Text>
+              <Text style={[styles.detailValue, { color: theme.colors.primary, fontWeight: 'bold' }]}>
+                {userProfile?.calorieGoal ? `${userProfile.calorieGoal} calories` : 'Not set'}
+              </Text>
+            </View>
+          </Card.Content>
+        </Card>
+
+        {bmi && bmr && (
+          <Card style={[styles.card, { backgroundColor: theme.colors.surface }]}>
+            <Card.Content>
+              <Title style={{ color: theme.colors.text }}>Health Metrics</Title>
+              <View style={styles.metricRow}>
+                <View style={styles.metric}>
+                  <Text style={styles.metricValue}>{bmi.toFixed(1)}</Text>
+                  <Text style={styles.metricLabel}>BMI</Text>
+                  <Text style={[styles.metricStatus, { color: bmiInfo.color }]}>
+                    {bmiInfo.category}
+                  </Text>
+                </View>
+                
+                <Divider style={styles.verticalDivider} />
+                
+                <View style={styles.metric}>
+                  <Text style={styles.metricValue}>{Math.round(bmr)}</Text>
+                  <Text style={styles.metricLabel}>BMR</Text>
+                  <Text style={styles.metricSubtext}>calories/day</Text>
+                </View>
+              </View>
+            </Card.Content>
+          </Card>
+        )}
+
+        {userProfile?.dietaryRestrictions?.length > 0 && (
+          <Card style={[styles.card, { backgroundColor: theme.colors.surface }]}>
+            <Card.Content>
+              <Title style={{ color: theme.colors.text }}>Dietary Restrictions</Title>
+              <View style={styles.restrictionsContainer}>
+                {userProfile.dietaryRestrictions.map((restriction, index) => (
+                  <View key={index} style={styles.restrictionItem}>
+                    <Feather name="check-circle" size={16} color={theme.colors.primary} style={styles.restrictionIcon} />
+                    <Text style={styles.restrictionText}>{restriction}</Text>
+                  </View>
+                ))}
+              </View>
+            </Card.Content>
+          </Card>
+        )}
+
+        {userProfile?.aiRecommendations && (
+          <Card style={[styles.card, { backgroundColor: theme.colors.surface }]}>
+            <Card.Content>
+              <Title style={{ color: theme.colors.text }}>AI Recommendations</Title>
+              <Text style={styles.recommendationText}>
+                {userProfile.aiRecommendations}
+              </Text>
+            </Card.Content>
+          </Card>
+        )}
+
+        <Button 
+          mode="contained" 
+          onPress={() => setIsEditing(true)}
+          style={styles.editButton}
+          icon="pencil"
+        >
+          Edit Profile
+        </Button>
       </View>
     );
-  }
-  
+  };
+
+  const renderEditForm = () => {
+    return (
+      <View style={styles.editForm}>
+        <Card style={[styles.card, { backgroundColor: theme.colors.surface }]}>
+          <Card.Content>
+            <Title style={{ color: theme.colors.text, marginBottom: 15 }}>Edit Profile</Title>
+            
+            <TextInput
+              label="Name"
+              value={formData.name}
+              onChangeText={(text) => handleInputChange('name', text)}
+              style={styles.input}
+              mode="outlined"
+            />
+            
+            <TextInput
+              label="Age"
+              value={formData.age}
+              onChangeText={(text) => handleInputChange('age', text)}
+              keyboardType="numeric"
+              style={styles.input}
+              mode="outlined"
+            />
+            
+            <TextInput
+              label="Gender (male/female)"
+              value={formData.gender}
+              onChangeText={(text) => handleInputChange('gender', text.toLowerCase())}
+              style={styles.input}
+              mode="outlined"
+            />
+            
+            <TextInput
+              label="Weight (kg)"
+              value={formData.weight}
+              onChangeText={(text) => handleInputChange('weight', text)}
+              keyboardType="numeric"
+              style={styles.input}
+              mode="outlined"
+            />
+            
+            <TextInput
+              label="Height (cm)"
+              value={formData.height}
+              onChangeText={(text) => handleInputChange('height', text)}
+              keyboardType="numeric"
+              style={styles.input}
+              mode="outlined"
+            />
+            
+            <View style={styles.buttonContainer}>
+              <Button 
+                mode="outlined" 
+                onPress={() => setIsEditing(false)}
+                style={[styles.button, styles.cancelButton]}
+              >
+                Cancel
+              </Button>
+              <Button 
+                mode="contained" 
+                onPress={handleSave}
+                style={[styles.button, styles.saveButton]}
+              >
+                Save
+              </Button>
+            </View>
+          </Card.Content>
+        </Card>
+      </View>
+    );
+  };
+
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1 }}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-    >
-      <ScrollView
-        style={[styles.container, { backgroundColor: theme.colors.background }]}
-        contentContainerStyle={styles.contentContainer}
-      >
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={[styles.headerTitle, { color: theme.colors.text }]}>
-            Profile
-          </Text>
-        </View>
-        
-        {/* Basic Information */}
-        <Animatable.View animation="fadeIn" duration={600}>
-          <Text style={[styles.sectionTitle, { color: theme.colors.secondaryText }]}>
-            BASIC INFORMATION
-          </Text>
-          
-          <View style={[styles.card, { backgroundColor: theme.colors.surface }]}>
-            {/* Name */}
-            <View style={styles.inputContainer}>
-              <Text style={[styles.inputLabel, { color: theme.colors.text }]}>
-                Name
-              </Text>
-              <TextInput
-                style={[
-                  styles.input,
-                  {
-                    color: theme.colors.text,
-                    backgroundColor: theme.colors.surfaceHighlight,
-                    borderColor: theme.colors.border,
-                  },
-                ]}
-                placeholder="Enter your name"
-                placeholderTextColor={theme.colors.placeholder}
-                value={name}
-                onChangeText={setName}
-              />
-            </View>
-            
-            {/* Age */}
-            <View style={styles.inputContainer}>
-              <Text style={[styles.inputLabel, { color: theme.colors.text }]}>
-                Age
-              </Text>
-              <TextInput
-                style={[
-                  styles.input,
-                  {
-                    color: theme.colors.text,
-                    backgroundColor: theme.colors.surfaceHighlight,
-                    borderColor: theme.colors.border,
-                  },
-                ]}
-                placeholder="Enter your age"
-                placeholderTextColor={theme.colors.placeholder}
-                keyboardType="number-pad"
-                value={age}
-                onChangeText={setAge}
-              />
-            </View>
-            
-            {/* Gender */}
-            <View style={styles.inputContainer}>
-              <Text style={[styles.inputLabel, { color: theme.colors.text }]}>
-                Gender
-              </Text>
-              <View style={styles.optionsContainer}>
-                <TouchableOpacity
-                  style={[
-                    styles.option,
-                    {
-                      backgroundColor:
-                        gender === 'male'
-                          ? theme.colors.primary
-                          : theme.colors.surfaceHighlight,
-                      borderColor:
-                        gender === 'male'
-                          ? theme.colors.primary
-                          : theme.colors.border,
-                    },
-                  ]}
-                  onPress={() => setGender('male')}
-                >
-                  <Text
-                    style={[
-                      styles.optionText,
-                      {
-                        color:
-                          gender === 'male' ? '#FFFFFF' : theme.colors.text,
-                      },
-                    ]}
-                  >
-                    Male
-                  </Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity
-                  style={[
-                    styles.option,
-                    {
-                      backgroundColor:
-                        gender === 'female'
-                          ? theme.colors.primary
-                          : theme.colors.surfaceHighlight,
-                      borderColor:
-                        gender === 'female'
-                          ? theme.colors.primary
-                          : theme.colors.border,
-                    },
-                  ]}
-                  onPress={() => setGender('female')}
-                >
-                  <Text
-                    style={[
-                      styles.optionText,
-                      {
-                        color:
-                          gender === 'female' ? '#FFFFFF' : theme.colors.text,
-                      },
-                    ]}
-                  >
-                    Female
-                  </Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity
-                  style={[
-                    styles.option,
-                    {
-                      backgroundColor:
-                        gender === 'other'
-                          ? theme.colors.primary
-                          : theme.colors.surfaceHighlight,
-                      borderColor:
-                        gender === 'other'
-                          ? theme.colors.primary
-                          : theme.colors.border,
-                    },
-                  ]}
-                  onPress={() => setGender('other')}
-                >
-                  <Text
-                    style={[
-                      styles.optionText,
-                      {
-                        color:
-                          gender === 'other' ? '#FFFFFF' : theme.colors.text,
-                      },
-                    ]}
-                  >
-                    Other
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </Animatable.View>
-        
-        {/* Physical Information */}
-        <Animatable.View animation="fadeIn" duration={600} delay={100}>
-          <Text style={[styles.sectionTitle, { color: theme.colors.secondaryText }]}>
-            PHYSICAL INFORMATION
-          </Text>
-          
-          <View style={[styles.card, { backgroundColor: theme.colors.surface }]}>
-            {/* Weight */}
-            <View style={styles.inputContainer}>
-              <Text style={[styles.inputLabel, { color: theme.colors.text }]}>
-                Weight (kg)
-              </Text>
-              <TextInput
-                style={[
-                  styles.input,
-                  {
-                    color: theme.colors.text,
-                    backgroundColor: theme.colors.surfaceHighlight,
-                    borderColor: theme.colors.border,
-                  },
-                ]}
-                placeholder="Enter your weight"
-                placeholderTextColor={theme.colors.placeholder}
-                keyboardType="decimal-pad"
-                value={weight}
-                onChangeText={setWeight}
-              />
-            </View>
-            
-            {/* Height */}
-            <View style={styles.inputContainer}>
-              <Text style={[styles.inputLabel, { color: theme.colors.text }]}>
-                Height (cm)
-              </Text>
-              <TextInput
-                style={[
-                  styles.input,
-                  {
-                    color: theme.colors.text,
-                    backgroundColor: theme.colors.surfaceHighlight,
-                    borderColor: theme.colors.border,
-                  },
-                ]}
-                placeholder="Enter your height"
-                placeholderTextColor={theme.colors.placeholder}
-                keyboardType="decimal-pad"
-                value={height}
-                onChangeText={setHeight}
-              />
-            </View>
-            
-            {/* BMI */}
-            {bmi > 0 && (
-              <View style={styles.bmiContainer}>
-                <View style={styles.bmiLabelContainer}>
-                  <Text style={[styles.bmiLabel, { color: theme.colors.text }]}>
-                    BMI
-                  </Text>
-                  <Text
-                    style={[
-                      styles.bmiValue,
-                      { color: theme.colors.text },
-                    ]}
-                  >
-                    {bmi}
-                  </Text>
-                </View>
-                <View
-                  style={[
-                    styles.bmiCategoryContainer,
-                    { backgroundColor: bmiCategory.color + '20' },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.bmiCategoryText,
-                      { color: bmiCategory.color },
-                    ]}
-                  >
-                    {bmiCategory.category}
-                  </Text>
-                </View>
-              </View>
-            )}
-          </View>
-        </Animatable.View>
-        
-        {/* Fitness Goals */}
-        <Animatable.View animation="fadeIn" duration={600} delay={200}>
-          <Text style={[styles.sectionTitle, { color: theme.colors.secondaryText }]}>
-            FITNESS GOALS
-          </Text>
-          
-          <View style={[styles.card, { backgroundColor: theme.colors.surface }]}>
-            {/* Activity Level */}
-            <View style={styles.inputContainer}>
-              <Text style={[styles.inputLabel, { color: theme.colors.text }]}>
-                Activity Level
-              </Text>
-              <View style={styles.activityOptionsContainer}>
-                <TouchableOpacity
-                  style={[
-                    styles.activityOption,
-                    {
-                      backgroundColor:
-                        activityLevel === 'sedentary'
-                          ? theme.colors.primary + '20'
-                          : 'transparent',
-                      borderColor:
-                        activityLevel === 'sedentary'
-                          ? theme.colors.primary
-                          : theme.colors.border,
-                    },
-                  ]}
-                  onPress={() => setActivityLevel('sedentary')}
-                >
-                  <Icon
-                    name="coffee"
-                    size={18}
-                    color={
-                      activityLevel === 'sedentary'
-                        ? theme.colors.primary
-                        : theme.colors.text
-                    }
-                  />
-                  <Text
-                    style={[
-                      styles.activityOptionTitle,
-                      {
-                        color:
-                          activityLevel === 'sedentary'
-                            ? theme.colors.primary
-                            : theme.colors.text,
-                      },
-                    ]}
-                  >
-                    Sedentary
-                  </Text>
-                  <Text
-                    style={[
-                      styles.activityOptionDesc,
-                      { color: theme.colors.secondaryText },
-                    ]}
-                  >
-                    Little to no exercise
-                  </Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity
-                  style={[
-                    styles.activityOption,
-                    {
-                      backgroundColor:
-                        activityLevel === 'light'
-                          ? theme.colors.primary + '20'
-                          : 'transparent',
-                      borderColor:
-                        activityLevel === 'light'
-                          ? theme.colors.primary
-                          : theme.colors.border,
-                    },
-                  ]}
-                  onPress={() => setActivityLevel('light')}
-                >
-                  <Icon
-                    name="sunset"
-                    size={18}
-                    color={
-                      activityLevel === 'light'
-                        ? theme.colors.primary
-                        : theme.colors.text
-                    }
-                  />
-                  <Text
-                    style={[
-                      styles.activityOptionTitle,
-                      {
-                        color:
-                          activityLevel === 'light'
-                            ? theme.colors.primary
-                            : theme.colors.text,
-                      },
-                    ]}
-                  >
-                    Light
-                  </Text>
-                  <Text
-                    style={[
-                      styles.activityOptionDesc,
-                      { color: theme.colors.secondaryText },
-                    ]}
-                  >
-                    Exercise 1-3 times/week
-                  </Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity
-                  style={[
-                    styles.activityOption,
-                    {
-                      backgroundColor:
-                        activityLevel === 'moderate'
-                          ? theme.colors.primary + '20'
-                          : 'transparent',
-                      borderColor:
-                        activityLevel === 'moderate'
-                          ? theme.colors.primary
-                          : theme.colors.border,
-                    },
-                  ]}
-                  onPress={() => setActivityLevel('moderate')}
-                >
-                  <Icon
-                    name="trending-up"
-                    size={18}
-                    color={
-                      activityLevel === 'moderate'
-                        ? theme.colors.primary
-                        : theme.colors.text
-                    }
-                  />
-                  <Text
-                    style={[
-                      styles.activityOptionTitle,
-                      {
-                        color:
-                          activityLevel === 'moderate'
-                            ? theme.colors.primary
-                            : theme.colors.text,
-                      },
-                    ]}
-                  >
-                    Moderate
-                  </Text>
-                  <Text
-                    style={[
-                      styles.activityOptionDesc,
-                      { color: theme.colors.secondaryText },
-                    ]}
-                  >
-                    Exercise 3-5 times/week
-                  </Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity
-                  style={[
-                    styles.activityOption,
-                    {
-                      backgroundColor:
-                        activityLevel === 'active'
-                          ? theme.colors.primary + '20'
-                          : 'transparent',
-                      borderColor:
-                        activityLevel === 'active'
-                          ? theme.colors.primary
-                          : theme.colors.border,
-                    },
-                  ]}
-                  onPress={() => setActivityLevel('active')}
-                >
-                  <Icon
-                    name="activity"
-                    size={18}
-                    color={
-                      activityLevel === 'active'
-                        ? theme.colors.primary
-                        : theme.colors.text
-                    }
-                  />
-                  <Text
-                    style={[
-                      styles.activityOptionTitle,
-                      {
-                        color:
-                          activityLevel === 'active'
-                            ? theme.colors.primary
-                            : theme.colors.text,
-                      },
-                    ]}
-                  >
-                    Active
-                  </Text>
-                  <Text
-                    style={[
-                      styles.activityOptionDesc,
-                      { color: theme.colors.secondaryText },
-                    ]}
-                  >
-                    Exercise 5-7 times/week
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-            
-            {/* Fitness Goal */}
-            <View style={styles.inputContainer}>
-              <Text style={[styles.inputLabel, { color: theme.colors.text }]}>
-                Goal
-              </Text>
-              <View style={styles.goalsContainer}>
-                <TouchableOpacity
-                  style={[
-                    styles.goalOption,
-                    {
-                      backgroundColor:
-                        fitnessGoal === 'lose'
-                          ? theme.colors.primary + '20'
-                          : 'transparent',
-                      borderColor:
-                        fitnessGoal === 'lose'
-                          ? theme.colors.primary
-                          : theme.colors.border,
-                    },
-                  ]}
-                  onPress={() => setFitnessGoal('lose')}
-                >
-                  <Icon
-                    name="trending-down"
-                    size={24}
-                    color={
-                      fitnessGoal === 'lose'
-                        ? theme.colors.primary
-                        : theme.colors.text
-                    }
-                  />
-                  <Text
-                    style={[
-                      styles.goalTitle,
-                      {
-                        color:
-                          fitnessGoal === 'lose'
-                            ? theme.colors.primary
-                            : theme.colors.text,
-                      },
-                    ]}
-                  >
-                    Lose Weight
-                  </Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity
-                  style={[
-                    styles.goalOption,
-                    {
-                      backgroundColor:
-                        fitnessGoal === 'maintain'
-                          ? theme.colors.primary + '20'
-                          : 'transparent',
-                      borderColor:
-                        fitnessGoal === 'maintain'
-                          ? theme.colors.primary
-                          : theme.colors.border,
-                    },
-                  ]}
-                  onPress={() => setFitnessGoal('maintain')}
-                >
-                  <Icon
-                    name="activity"
-                    size={24}
-                    color={
-                      fitnessGoal === 'maintain'
-                        ? theme.colors.primary
-                        : theme.colors.text
-                    }
-                  />
-                  <Text
-                    style={[
-                      styles.goalTitle,
-                      {
-                        color:
-                          fitnessGoal === 'maintain'
-                            ? theme.colors.primary
-                            : theme.colors.text,
-                      },
-                    ]}
-                  >
-                    Maintain
-                  </Text>
-                </TouchableOpacity>
-                
-                <TouchableOpacity
-                  style={[
-                    styles.goalOption,
-                    {
-                      backgroundColor:
-                        fitnessGoal === 'gain'
-                          ? theme.colors.primary + '20'
-                          : 'transparent',
-                      borderColor:
-                        fitnessGoal === 'gain'
-                          ? theme.colors.primary
-                          : theme.colors.border,
-                    },
-                  ]}
-                  onPress={() => setFitnessGoal('gain')}
-                >
-                  <Icon
-                    name="trending-up"
-                    size={24}
-                    color={
-                      fitnessGoal === 'gain'
-                        ? theme.colors.primary
-                        : theme.colors.text
-                    }
-                  />
-                  <Text
-                    style={[
-                      styles.goalTitle,
-                      {
-                        color:
-                          fitnessGoal === 'gain'
-                            ? theme.colors.primary
-                            : theme.colors.text,
-                      },
-                    ]}
-                  >
-                    Gain Muscle
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </Animatable.View>
-        
-        {/* Save Button */}
-        <Animatable.View animation="fadeIn" duration={600} delay={300}>
-          <TouchableOpacity
-            style={[
-              styles.saveButton,
-              { backgroundColor: theme.colors.primary },
-            ]}
-            onPress={handleSaveProfile}
-          >
-            <Text style={styles.saveButtonText}>Save Profile</Text>
-          </TouchableOpacity>
-        </Animatable.View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+    <ScrollView style={[styles.container, { backgroundColor: theme.colors.background }]}>
+      <View style={styles.header}>
+        <Avatar.Icon 
+          size={100} 
+          icon="account" 
+          style={{ backgroundColor: theme.colors.primary }} 
+        />
+        <Text style={[styles.name, { color: theme.colors.text }]}>
+          {userProfile?.name || 'User Profile'}
+        </Text>
+        <Text style={styles.subtitle}>
+          {userProfile?.fitnessGoal 
+            ? `Goal: ${fitnessGoals[userProfile.fitnessGoal]}` 
+            : 'Set your fitness goals'}
+        </Text>
+      </View>
+      
+      {isEditing ? renderEditForm() : renderProfileDetails()}
+      
+      <View style={styles.bottomPadding} />
+    </ScrollView>
   );
 };
 
@@ -713,136 +310,128 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  contentContainer: {
-    padding: 16,
-    paddingBottom: 40,
-  },
   header: {
-    marginBottom: 24,
-    marginTop: 10,
+    alignItems: 'center',
+    paddingVertical: 30,
   },
-  headerTitle: {
-    fontSize: 28,
+  name: {
+    fontSize: 24,
     fontWeight: 'bold',
+    marginTop: 15,
   },
-  sectionTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 12,
-    marginTop: 24,
+  subtitle: {
+    fontSize: 16,
+    opacity: 0.7,
+    color: '#fff',
+    marginTop: 5,
+  },
+  profileDetails: {
+    padding: 16,
   },
   card: {
-    borderRadius: 16,
-    padding: 16,
-  },
-  inputContainer: {
-    marginBottom: 20,
-  },
-  inputLabel: {
-    fontSize: 16,
-    fontWeight: '500',
-    marginBottom: 8,
-  },
-  input: {
-    height: 50,
+    marginBottom: 16,
     borderRadius: 12,
-    borderWidth: 1,
-    paddingHorizontal: 16,
-    fontSize: 16,
+    elevation: 4,
   },
-  optionsContainer: {
+  detailRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-  },
-  option: {
-    flex: 1,
-    height: 50,
-    justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 12,
-    borderWidth: 1,
-    marginHorizontal: 4,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255,255,255,0.1)',
   },
-  optionText: {
+  detailLabel: {
+    fontSize: 16,
+    color: '#fff',
+    opacity: 0.7,
+  },
+  detailValue: {
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  metricRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginVertical: 15,
+  },
+  metric: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  metricValue: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#fff',
+    marginBottom: 5,
+  },
+  metricLabel: {
+    fontSize: 16,
+    color: '#fff',
+    opacity: 0.7,
+    marginBottom: 2,
+  },
+  metricStatus: {
     fontSize: 14,
     fontWeight: '500',
   },
-  bmiContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  metricSubtext: {
+    fontSize: 14,
+    color: '#fff',
+    opacity: 0.7,
+  },
+  verticalDivider: {
+    height: '100%',
+    width: 1,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+  },
+  restrictionsContainer: {
     marginTop: 10,
   },
-  bmiLabelContainer: {
+  restrictionItem: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 8,
   },
-  bmiLabel: {
+  restrictionIcon: {
+    marginRight: 10,
+  },
+  restrictionText: {
     fontSize: 16,
-    fontWeight: '500',
-    marginRight: 8,
+    color: '#fff',
   },
-  bmiValue: {
+  recommendationText: {
     fontSize: 16,
-    fontWeight: 'bold',
+    color: '#fff',
+    lineHeight: 24,
+    marginTop: 10,
   },
-  bmiCategoryContainer: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 20,
+  editButton: {
+    marginTop: 10,
   },
-  bmiCategoryText: {
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  activityOptionsContainer: {
-    marginTop: 8,
-  },
-  activityOption: {
-    borderWidth: 1,
-    borderRadius: 12,
+  editForm: {
     padding: 16,
-    marginBottom: 10,
   },
-  activityOptionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginTop: 8,
+  input: {
+    marginBottom: 16,
   },
-  activityOptionDesc: {
-    fontSize: 14,
-    marginTop: 4,
-  },
-  goalsContainer: {
+  buttonContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 8,
+    marginTop: 10,
   },
-  goalOption: {
-    width: '31%',
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
+  button: {
+    flex: 1,
+    marginHorizontal: 5,
   },
-  goalTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginTop: 8,
-    textAlign: 'center',
+  cancelButton: {
+    borderColor: '#aaa',
   },
   saveButton: {
-    height: 56,
-    borderRadius: 28,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 40,
+    backgroundColor: '#4CAF50',
   },
-  saveButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '600',
+  bottomPadding: {
+    height: 80,
   },
 });
 

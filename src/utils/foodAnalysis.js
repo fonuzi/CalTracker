@@ -10,12 +10,7 @@
  * @returns {number} Total calories
  */
 export const calculateCaloriesFromMacros = (protein = 0, carbs = 0, fat = 0) => {
-  // Protein and carbs have 4 calories per gram, fat has 9 calories per gram
-  const proteinCalories = protein * 4;
-  const carbCalories = carbs * 4;
-  const fatCalories = fat * 9;
-  
-  return Math.round(proteinCalories + carbCalories + fatCalories);
+  return protein * 4 + carbs * 4 + fat * 9;
 };
 
 /**
@@ -26,20 +21,20 @@ export const calculateCaloriesFromMacros = (protein = 0, carbs = 0, fat = 0) => 
  * @returns {Object} Percentages of each macronutrient
  */
 export const calculateMacroPercentages = (protein = 0, carbs = 0, fat = 0) => {
-  const proteinCalories = protein * 4;
-  const carbCalories = carbs * 4;
-  const fatCalories = fat * 9;
-  
-  const totalCalories = proteinCalories + carbCalories + fatCalories;
+  const totalCalories = calculateCaloriesFromMacros(protein, carbs, fat);
   
   if (totalCalories === 0) {
-    return { protein: 0, carbs: 0, fat: 0 };
+    return { proteinPercentage: 0, carbsPercentage: 0, fatPercentage: 0 };
   }
   
+  const proteinCalories = protein * 4;
+  const carbsCalories = carbs * 4;
+  const fatCalories = fat * 9;
+  
   return {
-    protein: Math.round((proteinCalories / totalCalories) * 100),
-    carbs: Math.round((carbCalories / totalCalories) * 100),
-    fat: Math.round((fatCalories / totalCalories) * 100),
+    proteinPercentage: Math.round((proteinCalories / totalCalories) * 100),
+    carbsPercentage: Math.round((carbsCalories / totalCalories) * 100),
+    fatPercentage: Math.round((fatCalories / totalCalories) * 100)
   };
 };
 
@@ -49,29 +44,40 @@ export const calculateMacroPercentages = (protein = 0, carbs = 0, fat = 0) => {
  * @returns {Object} Formatted food data
  */
 export const formatFoodData = (food) => {
-  // Ensure all required fields are present
-  const formattedFood = {
-    id: food.id || generateFoodId(),
-    name: food.name || 'Unknown Food',
-    calories: food.calories || 0,
-    protein: food.protein || 0,
-    carbs: food.carbs || 0,
-    fat: food.fat || 0,
-    fiber: food.fiber || 0,
-    sugar: food.sugar || 0,
-    description: food.description || '',
-    healthScore: food.healthScore || 0,
-    tips: food.tips || '',
-    mealType: food.mealType || suggestMealTypeByTime(),
-    timestamp: food.timestamp || new Date().toISOString(),
-  };
+  const formattedFood = { ...food };
   
-  // Calculate calories if not provided but macros are
+  // Generate an ID if not present
+  if (!formattedFood.id) {
+    formattedFood.id = generateFoodId();
+  }
+  
+  // Set default meal type if not present
+  if (!formattedFood.mealType) {
+    formattedFood.mealType = suggestMealTypeByTime();
+  }
+  
+  // Set timestamp if not present
+  if (!formattedFood.timestamp) {
+    formattedFood.timestamp = new Date().toISOString();
+  }
+  
+  // Set method if not present
+  if (!formattedFood.method) {
+    formattedFood.method = 'text';
+  }
+  
+  // Round macros
+  if (formattedFood.protein) formattedFood.protein = Math.round(formattedFood.protein);
+  if (formattedFood.carbs) formattedFood.carbs = Math.round(formattedFood.carbs);
+  if (formattedFood.fat) formattedFood.fat = Math.round(formattedFood.fat);
+  if (formattedFood.calories) formattedFood.calories = Math.round(formattedFood.calories);
+  
+  // Calculate calories if not present but macros are
   if (!formattedFood.calories && (formattedFood.protein || formattedFood.carbs || formattedFood.fat)) {
     formattedFood.calories = calculateCaloriesFromMacros(
-      formattedFood.protein,
-      formattedFood.carbs,
-      formattedFood.fat
+      formattedFood.protein || 0,
+      formattedFood.carbs || 0,
+      formattedFood.fat || 0
     );
   }
   
@@ -96,15 +102,13 @@ export const calculateRemainingCalories = (goal, consumed) => {
 export const suggestMealTypeByTime = (date = new Date()) => {
   const hour = date.getHours();
   
-  if (hour >= 5 && hour < 10) {
+  if (hour >= 4 && hour < 10) {
     return 'breakfast';
-  } else if (hour >= 10 && hour < 12) {
-    return 'snack';
-  } else if (hour >= 12 && hour < 15) {
+  } else if (hour >= 10 && hour < 14) {
     return 'lunch';
-  } else if (hour >= 15 && hour < 18) {
+  } else if (hour >= 14 && hour < 17) {
     return 'snack';
-  } else if (hour >= 18 && hour < 22) {
+  } else if (hour >= 17 && hour < 22) {
     return 'dinner';
   } else {
     return 'snack';
@@ -117,16 +121,18 @@ export const suggestMealTypeByTime = (date = new Date()) => {
  * @returns {string} Food classification
  */
 export const classifyFoodByMacros = ({ protein = 0, carbs = 0, fat = 0 }) => {
-  const percentages = calculateMacroPercentages(protein, carbs, fat);
+  const { proteinPercentage, carbsPercentage, fatPercentage } = calculateMacroPercentages(protein, carbs, fat);
   
-  if (percentages.protein > 40) {
-    return 'High Protein';
-  } else if (percentages.carbs > 60) {
-    return 'High Carb';
-  } else if (percentages.fat > 40) {
-    return 'High Fat';
+  if (proteinPercentage > 40) {
+    return 'high-protein';
+  } else if (carbsPercentage > 60) {
+    return 'high-carb';
+  } else if (fatPercentage > 50) {
+    return 'high-fat';
+  } else if (protein > 0 && carbs > 0 && fat > 0) {
+    return 'balanced';
   } else {
-    return 'Balanced';
+    return 'unknown';
   }
 };
 
@@ -136,14 +142,16 @@ export const classifyFoodByMacros = ({ protein = 0, carbs = 0, fat = 0 }) => {
  * @returns {string} Portion size description
  */
 export const estimatePortionSize = (calories) => {
+  if (!calories) return 'Unknown';
+  
   if (calories < 200) {
-    return 'Small Snack';
-  } else if (calories < 400) {
-    return 'Large Snack / Small Meal';
-  } else if (calories < 700) {
-    return 'Regular Meal';
+    return 'Small';
+  } else if (calories < 500) {
+    return 'Medium';
+  } else if (calories < 800) {
+    return 'Large';
   } else {
-    return 'Large Meal';
+    return 'Extra Large';
   }
 };
 
@@ -153,5 +161,5 @@ export const estimatePortionSize = (calories) => {
  * @private
  */
 const generateFoodId = () => {
-  return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+  return 'food_' + Math.random().toString(36).substr(2, 9) + '_' + Date.now();
 };

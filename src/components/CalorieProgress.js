@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { calculateRemainingCalories } from '../utils/foodAnalysis';
+import { AnimatedCircularProgress } from 'react-native-circular-progress';
 
 /**
  * A component to display the user's daily calorie progress
@@ -8,81 +8,48 @@ import { calculateRemainingCalories } from '../utils/foodAnalysis';
  * @param {number} goal - Calorie goal for the day
  * @param {Object} theme - Current theme
  */
-const CalorieProgress = ({ consumed, goal, theme }) => {
-  // Calculate percentage for progress bar
+const CalorieProgress = ({ consumed = 0, goal = 2000, theme }) => {
+  // Calculate percentage
   const percentage = Math.min(100, Math.round((consumed / goal) * 100));
   
-  // Calculate calories remaining
-  const remaining = calculateRemainingCalories(goal, consumed);
-  
-  // Determine color based on percentage
-  const getProgressColor = () => {
-    if (percentage < 50) {
-      return theme.colors.success;
-    } else if (percentage < 80) {
-      return theme.colors.warning;
-    } else if (percentage < 100) {
-      return theme.colors.caution;
-    } else {
-      return theme.colors.error;
-    }
-  };
-  
-  // Format numbers with commas
-  const formatNumber = (num) => {
-    return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-  };
+  // Calculate remaining calories
+  const remaining = Math.max(0, goal - consumed);
   
   return (
-    <View style={[styles.container, { backgroundColor: theme.colors.surface }]}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={[styles.title, { color: theme.colors.text }]}>Calorie Budget</Text>
-        <Text style={[styles.value, { color: theme.colors.text }]}>
-          {formatNumber(consumed)} / {formatNumber(goal)}
-        </Text>
-      </View>
+    <View style={styles.container}>
+      <AnimatedCircularProgress
+        size={200}
+        width={15}
+        fill={percentage}
+        tintColor={theme.colors.primary}
+        backgroundColor={theme.colors.border}
+        arcSweepAngle={240}
+        rotation={240}
+        lineCap="round"
+      >
+        {() => (
+          <View style={styles.innerContainer}>
+            <Text style={[styles.consumedText, { color: theme.colors.text }]}>
+              {consumed}
+            </Text>
+            <Text style={[styles.unitText, { color: theme.colors.secondaryText }]}>
+              calories
+            </Text>
+          </View>
+        )}
+      </AnimatedCircularProgress>
       
-      {/* Progress bar */}
-      <View style={[styles.progressBar, { backgroundColor: theme.colors.border }]}>
-        <View
-          style={[
-            styles.progressFill,
-            {
-              width: `${percentage}%`,
-              backgroundColor: getProgressColor(),
-            },
-          ]}
-        />
-      </View>
-      
-      {/* Info row */}
-      <View style={styles.infoRow}>
-        <View style={styles.infoItem}>
-          <Text style={[styles.infoValue, { color: theme.colors.text }]}>
-            {formatNumber(consumed)}
-          </Text>
-          <Text style={[styles.infoLabel, { color: theme.colors.secondaryText }]}>
-            Consumed
-          </Text>
+      <View style={styles.statsContainer}>
+        <View style={styles.statItem}>
+          <Text style={[styles.statLabel, { color: theme.colors.secondaryText }]}>Goal</Text>
+          <Text style={[styles.statValue, { color: theme.colors.text }]}>{goal}</Text>
         </View>
         
-        <View style={styles.infoItem}>
-          <Text style={[styles.infoValue, { color: theme.colors.text }]}>
-            {formatNumber(remaining)}
-          </Text>
-          <Text style={[styles.infoLabel, { color: theme.colors.secondaryText }]}>
-            Remaining
-          </Text>
-        </View>
+        <View style={styles.divider} />
         
-        <View style={styles.infoItem}>
-          <Text style={[styles.infoValue, { color: theme.colors.text }]}>
-            {formatNumber(goal)}
-          </Text>
-          <Text style={[styles.infoLabel, { color: theme.colors.secondaryText }]}>
-            Goal
-          </Text>
+        <View style={styles.statItem}>
+          <Text style={[styles.statLabel, { color: theme.colors.secondaryText }]}>Remaining</Text>
+          <Text style={[styles.statValue, { color: theme.colors.text }]}>{remaining}</Text>
         </View>
       </View>
     </View>
@@ -91,49 +58,43 @@ const CalorieProgress = ({ consumed, goal, theme }) => {
 
 const styles = StyleSheet.create({
   container: {
-    borderRadius: 16,
-    padding: 16,
-    marginVertical: 8,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 12,
+    justifyContent: 'center',
+    padding: 20,
   },
-  title: {
+  innerContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  consumedText: {
+    fontSize: 36,
+    fontWeight: '700',
+  },
+  unitText: {
+    fontSize: 16,
+    marginTop: 5,
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    marginTop: 20,
+    width: '80%',
+    justifyContent: 'space-between',
+  },
+  statItem: {
+    alignItems: 'center',
+  },
+  statLabel: {
+    fontSize: 14,
+    marginBottom: 5,
+  },
+  statValue: {
     fontSize: 18,
-    fontWeight: 'bold',
-  },
-  value: {
-    fontSize: 16,
     fontWeight: '600',
   },
-  progressBar: {
-    height: 12,
-    borderRadius: 6,
-    marginBottom: 16,
-    overflow: 'hidden',
-  },
-  progressFill: {
+  divider: {
+    width: 1,
     height: '100%',
-    borderRadius: 6,
-  },
-  infoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  infoItem: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  infoValue: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginBottom: 4,
-  },
-  infoLabel: {
-    fontSize: 12,
+    backgroundColor: '#333333',
   },
 });
 

@@ -10,59 +10,67 @@ import { getMealTypeIcon, getMealTypeColor } from '../assets/icons';
  * @param {Function} onDelete - Function to call when delete button is pressed
  */
 const FoodItem = ({ food, onPress, onDelete, theme }) => {
-  // Format time from timestamp (e.g., "8:30 AM")
-  const formatTime = (timestamp) => {
-    const date = new Date(timestamp);
-    return date.toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-    });
-  };
-  
-  // Get icon and color for meal type
+  // Get the appropriate icon and color for the meal type
   const mealTypeIcon = getMealTypeIcon(food.mealType);
   const mealTypeColor = getMealTypeColor(food.mealType);
+  
+  // Format the time (assuming timestamp is in ISO format)
+  const formatTime = (timestamp) => {
+    if (!timestamp) return '';
+    const date = new Date(timestamp);
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
   
   return (
     <TouchableOpacity
       style={[styles.container, { backgroundColor: theme.colors.surface }]}
-      onPress={() => onPress(food)}
+      onPress={() => onPress && onPress(food)}
       activeOpacity={0.7}
     >
-      {/* Left icon for meal type */}
-      <View
-        style={[
-          styles.iconContainer,
-          { backgroundColor: mealTypeColor + '20' }, // 20% opacity
-        ]}
-      >
-        <Icon name={mealTypeIcon} size={18} color={mealTypeColor} />
-      </View>
-      
-      {/* Food info */}
-      <View style={styles.infoContainer}>
-        <Text style={[styles.foodName, { color: theme.colors.text }]}>
-          {food.name}
-        </Text>
-        <Text style={[styles.foodDetails, { color: theme.colors.secondaryText }]}>
-          {food.calories} cal • P: {Math.round(food.protein)}g • C: {Math.round(food.carbs)}g • F: {Math.round(food.fat)}g
-        </Text>
-      </View>
-      
-      {/* Right section with time and delete button */}
-      <View style={styles.rightContainer}>
-        <Text style={[styles.timeText, { color: theme.colors.secondaryText }]}>
-          {formatTime(food.timestamp)}
-        </Text>
-        
-        <TouchableOpacity
-          style={styles.deleteButton}
-          onPress={() => onDelete(food)}
-          hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
+      <View style={styles.content}>
+        <View
+          style={[
+            styles.iconContainer,
+            { backgroundColor: mealTypeColor + '20' },
+          ]}
         >
-          <Icon name="trash-2" size={16} color={theme.colors.error} />
-        </TouchableOpacity>
+          <Icon name={mealTypeIcon} size={20} color={mealTypeColor} />
+        </View>
+        
+        <View style={styles.infoContainer}>
+          <View style={styles.nameRow}>
+            <Text style={[styles.foodName, { color: theme.colors.text }]}>
+              {food.name}
+            </Text>
+            <TouchableOpacity
+              onPress={() => onDelete && onDelete(food)}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Icon name="trash-2" size={16} color={theme.colors.error} />
+            </TouchableOpacity>
+          </View>
+          
+          <View style={styles.detailsRow}>
+            <Text style={[styles.mealType, { color: theme.colors.secondaryText }]}>
+              {food.mealType || 'Meal'} · {formatTime(food.timestamp)}
+            </Text>
+            <Text style={[styles.calories, { color: theme.colors.primary }]}>
+              {food.calories} cal
+            </Text>
+          </View>
+          
+          <View style={styles.macrosRow}>
+            <Text style={[styles.macroText, { color: theme.colors.secondaryText }]}>
+              P: {food.protein}g
+            </Text>
+            <Text style={[styles.macroText, { color: theme.colors.secondaryText }]}>
+              C: {food.carbs}g
+            </Text>
+            <Text style={[styles.macroText, { color: theme.colors.secondaryText }]}>
+              F: {food.fat}g
+            </Text>
+          </View>
+        </View>
       </View>
     </TouchableOpacity>
   );
@@ -70,11 +78,18 @@ const FoodItem = ({ food, onPress, onDelete, theme }) => {
 
 const styles = StyleSheet.create({
   container: {
-    flexDirection: 'row',
     borderRadius: 12,
     padding: 12,
     marginBottom: 10,
-    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  content: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
   },
   iconContainer: {
     width: 40,
@@ -87,23 +102,35 @@ const styles = StyleSheet.create({
   infoContainer: {
     flex: 1,
   },
+  nameRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
   foodName: {
     fontSize: 16,
     fontWeight: '600',
+  },
+  detailsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 4,
   },
-  foodDetails: {
+  mealType: {
     fontSize: 12,
   },
-  rightContainer: {
-    alignItems: 'flex-end',
+  calories: {
+    fontSize: 14,
+    fontWeight: '600',
   },
-  timeText: {
+  macrosRow: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  macroText: {
     fontSize: 12,
-    marginBottom: 6,
-  },
-  deleteButton: {
-    padding: 4,
   },
 });
 

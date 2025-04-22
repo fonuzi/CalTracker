@@ -3,448 +3,451 @@ import {
   View, 
   Text, 
   StyleSheet, 
-  TouchableOpacity,
+  ScrollView, 
+  TouchableOpacity, 
   TextInput,
-  ScrollView,
   KeyboardAvoidingView,
   Platform
 } from 'react-native';
 import { UserContext } from '../context/UserContext';
-import { Icon } from '../assets/icons';
+import { analyzeFitnessGoals } from '../services/OpenAIService';
+import { calculateBMI, calculateBMR, calculateTDEE, calculateCalorieGoal, calculateMacroGoals } from '../utils/calculators';
 import * as Animatable from 'react-native-animatable';
 
 const OnboardingScreen = ({ theme }) => {
   const { updateUserProfile } = useContext(UserContext);
-  const [step, setStep] = useState(1);
-  const [name, setName] = useState('');
-  const [age, setAge] = useState('');
-  const [gender, setGender] = useState('');
-  const [weight, setWeight] = useState('');
-  const [height, setHeight] = useState('');
-  const [goal, setGoal] = useState('');
+  const [currentStep, setCurrentStep] = useState(1);
+  const [userData, setUserData] = useState({
+    name: '',
+    age: '',
+    gender: '',
+    weight: '',
+    height: '',
+    activityLevel: 'moderate',
+    fitnessGoal: 'maintain',
+    dietaryRestrictions: []
+  });
+  const [loading, setLoading] = useState(false);
+  const [recommendations, setRecommendations] = useState(null);
   
-  // Handle completion of onboarding
-  const handleComplete = async () => {
-    // Create a simple user profile
-    const userProfile = {
-      name: name || 'User',
-      age: parseInt(age) || 30,
-      gender: gender || 'other',
-      weight: parseFloat(weight) || 70,
-      height: parseFloat(height) || 170,
-      fitnessGoal: goal || 'maintain',
-      calorieGoal: 2000, // Default calorie goal
-      macroGoals: {
-        protein: 100,
-        carbs: 200,
-        fat: 60
-      },
-      theme: 'dark',
-      onboardingCompleted: true,
-      createdAt: new Date().toISOString()
-    };
-    
-    // Save the user profile
-    await updateUserProfile(userProfile);
+  // Handle input changes
+  const handleChange = (field, value) => {
+    setUserData(prev => ({ ...prev, [field]: value }));
   };
   
-  const renderStep1 = () => (
-    <View style={styles.stepContainer}>
-      <Text style={[styles.title, { color: theme.colors.text }]}>
-        Welcome to NutriTrack AI
-      </Text>
-      <Text style={[styles.subtitle, { color: theme.colors.secondaryText }]}>
-        Your personal AI-powered nutrition coach
-      </Text>
+  // Handle selection of gender, activity level, fitness goal, etc.
+  const handleSelect = (field, value) => {
+    setUserData(prev => ({ ...prev, [field]: value }));
+  };
+  
+  // Toggle dietary restriction
+  const toggleRestriction = (restriction) => {
+    setUserData(prev => {
+      const restrictions = [...prev.dietaryRestrictions];
+      const index = restrictions.indexOf(restriction);
       
-      <Animatable.View 
-        animation="fadeIn" 
-        delay={300} 
-        style={styles.inputContainer}
-      >
-        <Text style={[styles.label, { color: theme.colors.text }]}>
-          What's your name?
-        </Text>
+      if (index >= 0) {
+        restrictions.splice(index, 1);
+      } else {
+        restrictions.push(restriction);
+      }
+      
+      return { ...prev, dietaryRestrictions: restrictions };
+    });
+  };
+  
+  // Navigate to next step
+  const nextStep = () => {
+    setCurrentStep(prev => prev + 1);
+  };
+  
+  // Navigate to previous step
+  const prevStep = () => {
+    setCurrentStep(prev => prev - 1);
+  };
+  
+  // Complete onboarding and save user profile
+  const completeOnboarding = async () => {
+    try {
+      setLoading(true);
+      
+      // Calculate health metrics
+      const weight = parseFloat(userData.weight);
+      const height = parseFloat(userData.height);
+      
+      const bmi = calculateBMI(weight, height);
+      const bmr = calculateBMR(weight, height, parseInt(userData.age), userData.gender);
+      const tdee = calculateTDEE(bmr, userData.activityLevel);
+      const calorieGoal = calculateCalorieGoal(tdee, userData.fitnessGoal);
+      const macroGoals = calculateMacroGoals(calorieGoal, userData.fitnessGoal, weight);
+      
+      // Add health metrics to user data
+      const enrichedUserData = {
+        ...userData,
+        bmi,
+        bmr,
+        tdee,
+        calorieGoal,
+        macroGoals,
+        theme: 'dark',
+        onboardingCompleted: true,
+        createdAt: new Date().toISOString()
+      };
+      
+      // Get AI-powered recommendations based on user data
+      const aiRecommendations = await analyzeFitnessGoals(enrichedUserData);
+      
+      // Save recommendations for display
+      setRecommendations(aiRecommendations);
+      
+      // Add recommendations to user data
+      enrichedUserData.recommendations = aiRecommendations;
+      
+      // Save complete user profile
+      await updateUserProfile(enrichedUserData);
+      
+      // Go to final step to show recommendations
+      nextStep();
+    } catch (error) {
+      console.error('Error completing onboarding:', error);
+      alert('There was an error completing your profile. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+  
+  // Render basic input field
+  const renderInput = (label, field, placeholder, keyboardType = 'default') => {
+    return (
+      <View style={styles.inputContainer}>
+        <Text style={[styles.inputLabel, { color: theme.colors.text }]}>{label}</Text>
         <TextInput
           style={[
             styles.input,
             { 
               color: theme.colors.text,
               backgroundColor: theme.colors.surface,
-              borderColor: theme.colors.border 
+              borderColor: theme.colors.border
             }
           ]}
-          placeholder="Enter your name"
+          placeholder={placeholder}
           placeholderTextColor={theme.colors.placeholder}
-          value={name}
-          onChangeText={setName}
+          value={userData[field]}
+          onChangeText={(text) => handleChange(field, text)}
+          keyboardType={keyboardType}
         />
-      </Animatable.View>
-      
+      </View>
+    );
+  };
+  
+  // Render option button for selections (gender, activity level, etc.)
+  const renderOption = (field, value, label) => {
+    const isSelected = userData[field] === value;
+    return (
       <TouchableOpacity
-        style={[styles.button, { backgroundColor: theme.colors.primary }]}
-        onPress={() => setStep(2)}
+        style={[
+          styles.optionButton,
+          {
+            backgroundColor: isSelected ? theme.colors.primary : theme.colors.surface,
+            borderColor: isSelected ? theme.colors.primary : theme.colors.border
+          }
+        ]}
+        onPress={() => handleSelect(field, value)}
       >
-        <Text style={styles.buttonText}>Continue</Text>
+        <Text
+          style={[
+            styles.optionLabel,
+            { color: isSelected ? '#FFFFFF' : theme.colors.text }
+          ]}
+        >
+          {label}
+        </Text>
       </TouchableOpacity>
-    </View>
-  );
+    );
+  };
   
-  const renderStep2 = () => (
-    <View style={styles.stepContainer}>
-      <Text style={[styles.title, { color: theme.colors.text }]}>
-        Basic Information
-      </Text>
-      <Text style={[styles.subtitle, { color: theme.colors.secondaryText }]}>
-        Let's get to know you better
-      </Text>
-      
-      <Animatable.View animation="fadeIn" style={styles.inputContainer}>
-        <Text style={[styles.label, { color: theme.colors.text }]}>
-          Age
-        </Text>
-        <TextInput
+  // Render dietary restriction toggle
+  const renderRestrictionToggle = (value, label) => {
+    const isSelected = userData.dietaryRestrictions.includes(value);
+    return (
+      <TouchableOpacity
+        style={[
+          styles.restrictionToggle,
+          {
+            backgroundColor: isSelected ? theme.colors.primary + '20' : 'transparent',
+            borderColor: isSelected ? theme.colors.primary : theme.colors.border
+          }
+        ]}
+        onPress={() => toggleRestriction(value)}
+      >
+        <Text
           style={[
-            styles.input,
-            { 
-              color: theme.colors.text,
-              backgroundColor: theme.colors.surface,
-              borderColor: theme.colors.border 
-            }
+            styles.restrictionLabel,
+            { color: isSelected ? theme.colors.primary : theme.colors.text }
           ]}
-          placeholder="Enter your age"
-          placeholderTextColor={theme.colors.placeholder}
-          value={age}
-          onChangeText={setAge}
-          keyboardType="numeric"
-        />
-      </Animatable.View>
-      
-      <Animatable.View animation="fadeIn" delay={100} style={styles.inputContainer}>
-        <Text style={[styles.label, { color: theme.colors.text }]}>
-          Gender
-        </Text>
-        <View style={styles.optionsContainer}>
-          <TouchableOpacity
-            style={[
-              styles.option,
-              {
-                backgroundColor: gender === 'male' ? theme.colors.primary : theme.colors.surface,
-                borderColor: gender === 'male' ? theme.colors.primary : theme.colors.border,
-              },
-            ]}
-            onPress={() => setGender('male')}
-          >
-            <Text
-              style={[
-                styles.optionText,
-                {
-                  color: gender === 'male' ? '#FFFFFF' : theme.colors.text,
-                },
-              ]}
-            >
-              Male
-            </Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity
-            style={[
-              styles.option,
-              {
-                backgroundColor: gender === 'female' ? theme.colors.primary : theme.colors.surface,
-                borderColor: gender === 'female' ? theme.colors.primary : theme.colors.border,
-              },
-            ]}
-            onPress={() => setGender('female')}
-          >
-            <Text
-              style={[
-                styles.optionText,
-                {
-                  color: gender === 'female' ? '#FFFFFF' : theme.colors.text,
-                },
-              ]}
-            >
-              Female
-            </Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity
-            style={[
-              styles.option,
-              {
-                backgroundColor: gender === 'other' ? theme.colors.primary : theme.colors.surface,
-                borderColor: gender === 'other' ? theme.colors.primary : theme.colors.border,
-              },
-            ]}
-            onPress={() => setGender('other')}
-          >
-            <Text
-              style={[
-                styles.optionText,
-                {
-                  color: gender === 'other' ? '#FFFFFF' : theme.colors.text,
-                },
-              ]}
-            >
-              Other
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </Animatable.View>
-      
-      <View style={styles.navigationButtons}>
-        <TouchableOpacity
-          style={[
-            styles.backButton,
-            { borderColor: theme.colors.border },
-          ]}
-          onPress={() => setStep(1)}
         >
-          <Text style={[styles.backButtonText, { color: theme.colors.text }]}>
-            Back
-          </Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity
-          style={[
-            styles.button,
-            { backgroundColor: theme.colors.primary, flex: 1, marginLeft: 10 },
-          ]}
-          onPress={() => setStep(3)}
-        >
-          <Text style={styles.buttonText}>Continue</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
+          {label}
+        </Text>
+      </TouchableOpacity>
+    );
+  };
   
-  const renderStep3 = () => (
-    <View style={styles.stepContainer}>
-      <Text style={[styles.title, { color: theme.colors.text }]}>
-        Physical Information
-      </Text>
-      <Text style={[styles.subtitle, { color: theme.colors.secondaryText }]}>
-        This helps us calculate your calorie needs
-      </Text>
-      
-      <Animatable.View animation="fadeIn" style={styles.inputContainer}>
-        <Text style={[styles.label, { color: theme.colors.text }]}>
-          Weight (kg)
-        </Text>
-        <TextInput
-          style={[
-            styles.input,
-            { 
-              color: theme.colors.text,
-              backgroundColor: theme.colors.surface,
-              borderColor: theme.colors.border 
-            }
-          ]}
-          placeholder="Enter your weight"
-          placeholderTextColor={theme.colors.placeholder}
-          value={weight}
-          onChangeText={setWeight}
-          keyboardType="numeric"
-        />
-      </Animatable.View>
-      
-      <Animatable.View animation="fadeIn" delay={100} style={styles.inputContainer}>
-        <Text style={[styles.label, { color: theme.colors.text }]}>
-          Height (cm)
-        </Text>
-        <TextInput
-          style={[
-            styles.input,
-            { 
-              color: theme.colors.text,
-              backgroundColor: theme.colors.surface,
-              borderColor: theme.colors.border 
-            }
-          ]}
-          placeholder="Enter your height"
-          placeholderTextColor={theme.colors.placeholder}
-          value={height}
-          onChangeText={setHeight}
-          keyboardType="numeric"
-        />
-      </Animatable.View>
-      
-      <View style={styles.navigationButtons}>
-        <TouchableOpacity
-          style={[
-            styles.backButton,
-            { borderColor: theme.colors.border },
-          ]}
-          onPress={() => setStep(2)}
-        >
-          <Text style={[styles.backButtonText, { color: theme.colors.text }]}>
-            Back
-          </Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity
-          style={[
-            styles.button,
-            { backgroundColor: theme.colors.primary, flex: 1, marginLeft: 10 },
-          ]}
-          onPress={() => setStep(4)}
-        >
-          <Text style={styles.buttonText}>Continue</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-  
-  const renderStep4 = () => (
-    <View style={styles.stepContainer}>
-      <Text style={[styles.title, { color: theme.colors.text }]}>
-        Your Goals
-      </Text>
-      <Text style={[styles.subtitle, { color: theme.colors.secondaryText }]}>
-        What do you want to achieve?
-      </Text>
-      
-      <Animatable.View animation="fadeIn" style={styles.goalsContainer}>
-        <TouchableOpacity
-          style={[
-            styles.goalOption,
-            {
-              backgroundColor: goal === 'lose' ? theme.colors.primary + '20' : 'transparent',
-              borderColor: goal === 'lose' ? theme.colors.primary : theme.colors.border,
-            },
-          ]}
-          onPress={() => setGoal('lose')}
-        >
-          <Icon 
-            name="trending-down" 
-            size={24} 
-            color={goal === 'lose' ? theme.colors.primary : theme.colors.text} 
-          />
-          <Text 
-            style={[
-              styles.goalTitle, 
-              { color: goal === 'lose' ? theme.colors.primary : theme.colors.text }
-            ]}
-          >
-            Lose Weight
-          </Text>
-          <Text 
-            style={[
-              styles.goalDescription, 
-              { color: theme.colors.secondaryText }
-            ]}
-          >
-            Create a calorie deficit to lose weight gradually
-          </Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity
-          style={[
-            styles.goalOption,
-            {
-              backgroundColor: goal === 'maintain' ? theme.colors.primary + '20' : 'transparent',
-              borderColor: goal === 'maintain' ? theme.colors.primary : theme.colors.border,
-            },
-          ]}
-          onPress={() => setGoal('maintain')}
-        >
-          <Icon 
-            name="activity" 
-            size={24} 
-            color={goal === 'maintain' ? theme.colors.primary : theme.colors.text} 
-          />
-          <Text 
-            style={[
-              styles.goalTitle, 
-              { color: goal === 'maintain' ? theme.colors.primary : theme.colors.text }
-            ]}
-          >
-            Maintain Weight
-          </Text>
-          <Text 
-            style={[
-              styles.goalDescription, 
-              { color: theme.colors.secondaryText }
-            ]}
-          >
-            Stay at your current weight and improve nutrition
-          </Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity
-          style={[
-            styles.goalOption,
-            {
-              backgroundColor: goal === 'gain' ? theme.colors.primary + '20' : 'transparent',
-              borderColor: goal === 'gain' ? theme.colors.primary : theme.colors.border,
-            },
-          ]}
-          onPress={() => setGoal('gain')}
-        >
-          <Icon 
-            name="trending-up" 
-            size={24} 
-            color={goal === 'gain' ? theme.colors.primary : theme.colors.text} 
-          />
-          <Text 
-            style={[
-              styles.goalTitle, 
-              { color: goal === 'gain' ? theme.colors.primary : theme.colors.text }
-            ]}
-          >
-            Gain Muscle
-          </Text>
-          <Text 
-            style={[
-              styles.goalDescription, 
-              { color: theme.colors.secondaryText }
-            ]}
-          >
-            Increase calories and protein for muscle growth
-          </Text>
-        </TouchableOpacity>
-      </Animatable.View>
-      
-      <View style={styles.navigationButtons}>
-        <TouchableOpacity
-          style={[
-            styles.backButton,
-            { borderColor: theme.colors.border },
-          ]}
-          onPress={() => setStep(3)}
-        >
-          <Text style={[styles.backButtonText, { color: theme.colors.text }]}>
-            Back
-          </Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity
-          style={[
-            styles.button,
-            { backgroundColor: theme.colors.primary, flex: 1, marginLeft: 10 },
-          ]}
-          onPress={handleComplete}
-        >
-          <Text style={styles.buttonText}>Get Started</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-  
-  // Render the appropriate step
-  const renderCurrentStep = () => {
-    switch (step) {
+  // Render current step content
+  const renderStepContent = () => {
+    switch (currentStep) {
       case 1:
-        return renderStep1();
+        return (
+          <Animatable.View animation="fadeIn" duration={500}>
+            <Text style={[styles.stepTitle, { color: theme.colors.text }]}>
+              Welcome to NutriTrack AI
+            </Text>
+            <Text style={[styles.stepDescription, { color: theme.colors.secondaryText }]}>
+              Let's set up your profile to get personalized nutrition and fitness recommendations.
+            </Text>
+            
+            {renderInput('What should we call you?', 'name', 'Your name')}
+            
+            <View style={styles.buttonContainer}>
+              <TouchableOpacity
+                style={[styles.button, { backgroundColor: theme.colors.primary }]}
+                onPress={nextStep}
+              >
+                <Text style={styles.buttonText}>Next</Text>
+              </TouchableOpacity>
+            </View>
+          </Animatable.View>
+        );
+        
       case 2:
-        return renderStep2();
+        return (
+          <Animatable.View animation="fadeIn" duration={500}>
+            <Text style={[styles.stepTitle, { color: theme.colors.text }]}>
+              Basic Information
+            </Text>
+            <Text style={[styles.stepDescription, { color: theme.colors.secondaryText }]}>
+              We need some basic information to calculate your nutritional needs.
+            </Text>
+            
+            {renderInput('Age', 'age', 'Your age', 'numeric')}
+            
+            <Text style={[styles.sectionLabel, { color: theme.colors.text }]}>Gender</Text>
+            <View style={styles.optionsRow}>
+              {renderOption('gender', 'male', 'Male')}
+              {renderOption('gender', 'female', 'Female')}
+              {renderOption('gender', 'other', 'Other')}
+            </View>
+            
+            <View style={styles.buttonContainer}>
+              <TouchableOpacity
+                style={[styles.buttonSecondary, { borderColor: theme.colors.border }]}
+                onPress={prevStep}
+              >
+                <Text style={[styles.buttonSecondaryText, { color: theme.colors.text }]}>Back</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.button, { backgroundColor: theme.colors.primary }]}
+                onPress={nextStep}
+              >
+                <Text style={styles.buttonText}>Next</Text>
+              </TouchableOpacity>
+            </View>
+          </Animatable.View>
+        );
+        
       case 3:
-        return renderStep3();
+        return (
+          <Animatable.View animation="fadeIn" duration={500}>
+            <Text style={[styles.stepTitle, { color: theme.colors.text }]}>
+              Physical Metrics
+            </Text>
+            <Text style={[styles.stepDescription, { color: theme.colors.secondaryText }]}>
+              Let's get your weight and height to calculate your ideal calorie intake.
+            </Text>
+            
+            {renderInput('Weight (kg)', 'weight', 'Your weight in kilograms', 'numeric')}
+            {renderInput('Height (cm)', 'height', 'Your height in centimeters', 'numeric')}
+            
+            <View style={styles.buttonContainer}>
+              <TouchableOpacity
+                style={[styles.buttonSecondary, { borderColor: theme.colors.border }]}
+                onPress={prevStep}
+              >
+                <Text style={[styles.buttonSecondaryText, { color: theme.colors.text }]}>Back</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.button, { backgroundColor: theme.colors.primary }]}
+                onPress={nextStep}
+              >
+                <Text style={styles.buttonText}>Next</Text>
+              </TouchableOpacity>
+            </View>
+          </Animatable.View>
+        );
+        
       case 4:
-        return renderStep4();
+        return (
+          <Animatable.View animation="fadeIn" duration={500}>
+            <Text style={[styles.stepTitle, { color: theme.colors.text }]}>
+              Activity & Goals
+            </Text>
+            <Text style={[styles.stepDescription, { color: theme.colors.secondaryText }]}>
+              Tell us about your activity level and fitness goals.
+            </Text>
+            
+            <Text style={[styles.sectionLabel, { color: theme.colors.text }]}>Activity Level</Text>
+            <View style={styles.optionsColumn}>
+              {renderOption('activityLevel', 'sedentary', 'Sedentary (little or no exercise)')}
+              {renderOption('activityLevel', 'light', 'Light (exercise 1-3 times/week)')}
+              {renderOption('activityLevel', 'moderate', 'Moderate (exercise 3-5 times/week)')}
+              {renderOption('activityLevel', 'active', 'Active (exercise 6-7 times/week)')}
+              {renderOption('activityLevel', 'very_active', 'Very Active (hard exercise daily)')}
+            </View>
+            
+            <Text style={[styles.sectionLabel, { color: theme.colors.text, marginTop: 20 }]}>Fitness Goal</Text>
+            <View style={styles.optionsColumn}>
+              {renderOption('fitnessGoal', 'lose', 'Lose Weight')}
+              {renderOption('fitnessGoal', 'maintain', 'Maintain Weight')}
+              {renderOption('fitnessGoal', 'gain', 'Gain Muscle')}
+            </View>
+            
+            <View style={styles.buttonContainer}>
+              <TouchableOpacity
+                style={[styles.buttonSecondary, { borderColor: theme.colors.border }]}
+                onPress={prevStep}
+              >
+                <Text style={[styles.buttonSecondaryText, { color: theme.colors.text }]}>Back</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.button, { backgroundColor: theme.colors.primary }]}
+                onPress={nextStep}
+              >
+                <Text style={styles.buttonText}>Next</Text>
+              </TouchableOpacity>
+            </View>
+          </Animatable.View>
+        );
+        
+      case 5:
+        return (
+          <Animatable.View animation="fadeIn" duration={500}>
+            <Text style={[styles.stepTitle, { color: theme.colors.text }]}>
+              Dietary Preferences
+            </Text>
+            <Text style={[styles.stepDescription, { color: theme.colors.secondaryText }]}>
+              Do you have any dietary restrictions or preferences?
+            </Text>
+            
+            <View style={styles.restrictionsContainer}>
+              {renderRestrictionToggle('vegetarian', 'Vegetarian')}
+              {renderRestrictionToggle('vegan', 'Vegan')}
+              {renderRestrictionToggle('gluten_free', 'Gluten-Free')}
+              {renderRestrictionToggle('dairy_free', 'Dairy-Free')}
+              {renderRestrictionToggle('keto', 'Keto')}
+              {renderRestrictionToggle('paleo', 'Paleo')}
+              {renderRestrictionToggle('low_carb', 'Low-Carb')}
+              {renderRestrictionToggle('low_fat', 'Low-Fat')}
+            </View>
+            
+            <View style={styles.buttonContainer}>
+              <TouchableOpacity
+                style={[styles.buttonSecondary, { borderColor: theme.colors.border }]}
+                onPress={prevStep}
+              >
+                <Text style={[styles.buttonSecondaryText, { color: theme.colors.text }]}>Back</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.button, { backgroundColor: theme.colors.primary }]}
+                onPress={completeOnboarding}
+                disabled={loading}
+              >
+                <Text style={styles.buttonText}>
+                  {loading ? 'Processing...' : 'Complete Setup'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </Animatable.View>
+        );
+        
+      case 6:
+        // Final step with recommendations
+        return (
+          <Animatable.View animation="fadeIn" duration={500}>
+            <Text style={[styles.stepTitle, { color: theme.colors.text }]}>
+              You're all set!
+            </Text>
+            <Text style={[styles.stepDescription, { color: theme.colors.secondaryText }]}>
+              Based on your information, here are some personalized recommendations:
+            </Text>
+            
+            {recommendations && (
+              <View style={styles.recommendationsContainer}>
+                <Text style={[styles.sectionLabel, { color: theme.colors.text }]}>
+                  Recommended Daily Intake
+                </Text>
+                <Text style={[styles.recommendationValue, { color: theme.colors.primary }]}>
+                  {userData.calorieGoal} calories
+                </Text>
+                
+                <Text style={[styles.sectionLabel, { color: theme.colors.text, marginTop: 15 }]}>
+                  Macronutrient Goals
+                </Text>
+                <View style={styles.macrosContainer}>
+                  <View style={styles.macroItem}>
+                    <Text style={[styles.macroValue, { color: theme.colors.text }]}>
+                      {userData.macroGoals.protein}g
+                    </Text>
+                    <Text style={[styles.macroLabel, { color: theme.colors.secondaryText }]}>
+                      Protein
+                    </Text>
+                  </View>
+                  <View style={styles.macroItem}>
+                    <Text style={[styles.macroValue, { color: theme.colors.text }]}>
+                      {userData.macroGoals.carbs}g
+                    </Text>
+                    <Text style={[styles.macroLabel, { color: theme.colors.secondaryText }]}>
+                      Carbs
+                    </Text>
+                  </View>
+                  <View style={styles.macroItem}>
+                    <Text style={[styles.macroValue, { color: theme.colors.text }]}>
+                      {userData.macroGoals.fat}g
+                    </Text>
+                    <Text style={[styles.macroLabel, { color: theme.colors.secondaryText }]}>
+                      Fat
+                    </Text>
+                  </View>
+                </View>
+                
+                <Text style={[styles.sectionLabel, { color: theme.colors.text, marginTop: 15 }]}>
+                  AI Recommendations
+                </Text>
+                {recommendations.recommendations && recommendations.recommendations.map((rec, i) => (
+                  <Text 
+                    key={i} 
+                    style={[styles.recommendationText, { color: theme.colors.secondaryText }]}
+                  >
+                    • {rec}
+                  </Text>
+                ))}
+              </View>
+            )}
+            
+            <View style={styles.buttonContainer}>
+              <TouchableOpacity
+                style={[styles.button, { backgroundColor: theme.colors.primary }]}
+                onPress={() => {
+                  // Navigate to the main app
+                  // This will happen automatically because we updated userProfile in context
+                }}
+              >
+                <Text style={styles.buttonText}>Get Started</Text>
+              </TouchableOpacity>
+            </View>
+          </Animatable.View>
+        );
+        
       default:
-        return renderStep1();
+        return null;
     }
   };
   
@@ -452,6 +455,7 @@ const OnboardingScreen = ({ theme }) => {
     <KeyboardAvoidingView
       style={[styles.container, { backgroundColor: theme.colors.background }]}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0}
     >
       <ScrollView
         contentContainerStyle={styles.scrollContainer}
@@ -459,22 +463,23 @@ const OnboardingScreen = ({ theme }) => {
       >
         {/* Progress indicator */}
         <View style={styles.progressContainer}>
-          {[1, 2, 3, 4].map((s) => (
+          {[1, 2, 3, 4, 5, 6].map(step => (
             <View
-              key={s}
+              key={step}
               style={[
                 styles.progressDot,
                 {
-                  backgroundColor: s <= step ? theme.colors.primary : theme.colors.border,
-                  width: s === step ? 12 : 8,
-                  height: s === step ? 12 : 8,
-                },
+                  backgroundColor: currentStep >= step ? theme.colors.primary : theme.colors.border,
+                  width: currentStep === step ? 12 : 8,
+                  height: currentStep === step ? 12 : 8,
+                }
               ]}
             />
           ))}
         </View>
         
-        {renderCurrentStep()}
+        {/* Step content */}
+        {renderStepContent()}
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -486,109 +491,142 @@ const styles = StyleSheet.create({
   },
   scrollContainer: {
     flexGrow: 1,
-    paddingHorizontal: 20,
-    paddingTop: 60,
-    paddingBottom: 40,
+    padding: 20,
   },
   progressContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginBottom: 30,
+    marginVertical: 20,
   },
   progressDot: {
-    borderRadius: 6,
-    marginHorizontal: 6,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginHorizontal: 5,
   },
-  stepContainer: {
-    flex: 1,
+  stepTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    marginBottom: 10,
   },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    marginBottom: 8,
-  },
-  subtitle: {
+  stepDescription: {
     fontSize: 16,
     marginBottom: 30,
   },
   inputContainer: {
     marginBottom: 20,
   },
-  label: {
+  inputLabel: {
     fontSize: 16,
-    fontWeight: '500',
-    marginBottom: 8,
+    fontWeight: '600',
+    marginBottom: 5,
   },
   input: {
     height: 50,
     borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 16,
+    borderRadius: 8,
+    paddingHorizontal: 15,
     fontSize: 16,
   },
-  optionsContainer: {
+  sectionLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 10,
+  },
+  optionsRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    marginBottom: 20,
   },
-  option: {
-    flex: 1,
-    height: 50,
+  optionsColumn: {
+    marginBottom: 20,
+  },
+  optionButton: {
     borderWidth: 1,
-    borderRadius: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginHorizontal: 4,
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 15,
+    marginRight: 10,
+    marginBottom: 10,
   },
-  optionText: {
+  optionLabel: {
     fontSize: 14,
     fontWeight: '500',
   },
-  goalsContainer: {
-    marginBottom: 20,
+  restrictionsContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: 30,
   },
-  goalOption: {
-    padding: 16,
+  restrictionToggle: {
     borderWidth: 1,
-    borderRadius: 12,
-    marginBottom: 12,
+    borderRadius: 20,
+    paddingVertical: 8,
+    paddingHorizontal: 15,
+    marginRight: 10,
+    marginBottom: 10,
   },
-  goalTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginTop: 8,
-    marginBottom: 4,
-  },
-  goalDescription: {
+  restrictionLabel: {
     fontSize: 14,
+    fontWeight: '500',
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 10,
   },
   button: {
-    height: 56,
-    borderRadius: 12,
+    flex: 1,
+    height: 50,
+    borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: 10,
   },
   buttonText: {
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
   },
-  navigationButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 20,
-  },
-  backButton: {
-    height: 56,
-    borderRadius: 12,
+  buttonSecondary: {
+    flex: 1,
+    height: 50,
+    borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 1,
-    paddingHorizontal: 20,
+    marginRight: 10,
   },
-  backButtonText: {
+  buttonSecondaryText: {
     fontSize: 16,
     fontWeight: '600',
+  },
+  recommendationsContainer: {
+    marginBottom: 30,
+  },
+  recommendationValue: {
+    fontSize: 32,
+    fontWeight: '700',
+  },
+  macrosContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 10,
+  },
+  macroItem: {
+    alignItems: 'center',
+  },
+  macroValue: {
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  macroLabel: {
+    fontSize: 14,
+    marginTop: 5,
+  },
+  recommendationText: {
+    fontSize: 16,
+    lineHeight: 24,
+    marginBottom: 5,
   },
 });
 
